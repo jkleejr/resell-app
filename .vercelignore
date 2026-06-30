@@ -1,0 +1,8 @@
+# The backend deploy only needs api/, lib/, public/, and config files.
+# Exclude the mobile app and dependency/build folders (Vercel installs deps
+# itself from package.json), which also keeps us under the upload file limit.
+node_modules
+mobile
+.expo
+.git
+*.log
