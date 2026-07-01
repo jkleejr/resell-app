@@ -7,6 +7,8 @@ export const CATEGORIES = [
   "electronics",
   "clothing",
   "shoes",
+  "jewelry",
+  "accessory",
   "collectible",
   "kitchenware",
   "home_decor",

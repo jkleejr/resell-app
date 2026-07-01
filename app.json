@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "99430001-416f-400f-a1bb-0b7fdcc85654"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.jkleejr.flipbackend",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

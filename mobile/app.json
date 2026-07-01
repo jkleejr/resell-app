@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Loot Check",
+    "slug": "resell-it",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.resellit.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.resellit.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#047857",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Loot Check needs access to your photos so you can pick a picture of an item to sell.",
+          "cameraPermission": "Loot Check needs camera access so you can photograph an item to sell.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#047857"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2de58bb4-a1c6-4767-abea-8ec42bfbd500"
+      }
+    },
+    "owner": "jkleejr",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2de58bb4-a1c6-4767-abea-8ec42bfbd500"
+    }
+  }
+}
