@@ -125,6 +125,6 @@ export function provenanceLabel(price: PriceResult): string {
     case "comparable":
       return "Based on similar items (no exact match found)";
     case "estimate":
-      return "Rough estimate — no sales data found";
+      return "Rough estimate — not based on sold listings";
   }
 }

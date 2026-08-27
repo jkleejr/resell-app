@@ -1,6 +1,7 @@
 # App Store listing — Loot Check
 
 Copy each field into the matching App Store Connect field.
+Current submission: **1.0.1** (build auto-increments remotely; last shipped was 1.0.0 build 2, 30 Jun 2026).
 
 ## App Name (max 30)
 Loot Check
@@ -19,10 +20,32 @@ resell,resale,declutter,thrift,flip,ebay,poshmark,mercari,depop,price,value,seco
 > trademark-flag risk. If a reviewer objects, swap them for:
 > marketplace,vintage,used,collectibles,estate
 
-## Description (max 4000)
-Got stuff you might sell but no idea what it's worth? Loot Check turns a single photo into an answer — what the item is, what it's worth, and the best place to sell it.
+## What's New in This Version (max 4000)
 
-Snap a photo and Loot Check identifies the item, estimates its resale value, recommends where to list it, and even writes the listing for you. Turn the clutter in your closet into cash.
+Paste into App Store Connect → the new version's **What's New in This Version** field.
+Required for every update; it's the one listing field a new version forces you to fill in.
+
+```
+• A new app icon and a refreshed launch screen
+• Clearer wording on prices, so it's obvious at a glance when a value is an estimate rather than a match against real sales
+```
+
+### Release-note history
+
+- **1.0.1** — new icon + launch screen; clearer price-estimate wording.
+- **1.0.0** — initial release.
+
+## Description (max 4000)
+
+Note: Apple does **not** index the description for App Store search — only the name,
+subtitle, and keywords. So this field is written for conversion, not keywords. The
+first ~170 characters are what shows before the "more" cutoff; everything important
+is front-loaded.
+
+```
+Got stuff you might sell but no idea what it's worth? Snap one photo. Loot Check tells you what the item is, what it's realistically worth secondhand, and where to sell it — in seconds.
+
+No account. No sign-up. No ads. Just point your camera at the clutter in your closet and find out what it's actually worth.
 
 HOW IT WORKS
 • Snap a photo — or add a few angles (a close-up of a logo or label helps nail the exact product)
@@ -44,6 +67,7 @@ A NOTE ON PRICES
 Values shown are estimates to guide your pricing, not guarantees. What an item actually sells for depends on its condition, demand, and timing.
 
 Free to use. No ads, no account required. Find out what your stuff is really worth with Loot Check.
+```
 
 ## Other required fields (reference)
 - Support URL: https://resell-it-backend.vercel.app/support
@@ -51,6 +75,38 @@ Free to use. No ads, no account required. Find out what your stuff is really wor
 - Primary category: Shopping (or Utilities)
 - Age rating: 4+
 - Price: Free
+
+## Submission checklist for an update
+
+Most listing metadata carries over from the last version untouched. These are the
+things a new version actually makes you handle:
+
+- [ ] **Version string** — `mobile/app.json` → `expo.version` is `1.0.1`. The build
+      number is managed remotely (`appVersionSource: "remote"` in `eas.json`) and
+      `autoIncrement` bumps it to 3 on the next production build. Don't set it by hand.
+- [ ] **New build** — the icon lives in the binary, so this needs `eas build -p ios
+      --profile production`, not an OTA update. Then `eas submit -p ios`.
+- [ ] **What's New** — paste the block above. Mandatory field on every update.
+- [ ] **Screenshots** — no change needed. `App.tsx` hasn't been touched since the
+      1.0.0 build, and the app UI never renders the icon asset, so the existing
+      screenshots still match what a reviewer will see.
+- [ ] **Export compliance** — already declared in `app.json`
+      (`ITSAppUsesNonExemptEncryption: false`), so App Store Connect won't re-ask.
+- [ ] **App Privacy** — unchanged. No new data is collected in this version; the
+      two-item answer below still matches the app's behaviour.
+- [ ] **Age rating questionnaire** — Apple replaced this in 2025 and required every
+      app to re-answer it by 31 Jan 2026 or be blocked from submitting updates. If
+      the 1.0.0 submission predates your answering it, App Store Connect will make
+      you complete it before this build can go anywhere.
+- [ ] **Minimum SDK** — since 28 Apr 2026, uploads must be built with Xcode 26 /
+      the iOS 26 SDK. The 30 Jun 2026 production build already cleared this on
+      Expo SDK 54, so the next EAS build will too.
+
+### Note on runtime version
+
+`app.json` sets `runtimeVersion.policy: "appVersion"`. Bumping to 1.0.1 starts a new
+OTA channel: updates published for 1.0.0 will no longer reach 1.0.1 installs, and
+vice versa. Expected — just don't expect an OTA to patch both at once.
 
 ## App Privacy questionnaire (App Store Connect → App Privacy)
 
