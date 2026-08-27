@@ -27,12 +27,14 @@ Required for every update; it's the one listing field a new version forces you t
 
 ```
 • A new app icon and a refreshed launch screen
-• A simpler, faster price card — your estimated resale range now appears instantly with the result
+• Faster results — your estimated resale value now appears the moment the item is identified
+• A cleaner price card
 ```
 
 ### Release-note history
 
-- **1.0.1** — new icon + launch screen; price shown instantly with the result.
+- **1.0.1** — new icon + launch screen; price now renders instantly on-device
+  (the sold-comps lookup that never shipped was removed along with its caption).
 - **1.0.0** — initial release.
 
 ## Description (max 4000)
@@ -40,33 +42,34 @@ Required for every update; it's the one listing field a new version forces you t
 Note: Apple does **not** index the description for App Store search — only the name,
 subtitle, and keywords. So this field is written for conversion, not keywords. The
 first ~170 characters are what shows before the "more" cutoff; everything important
-is front-loaded.
+is front-loaded. Nothing here claims the prices come from market or sales data —
+they are the model's estimates, and "A NOTE ON PRICES" says so plainly.
 
 ```
-Got stuff you might sell but no idea what it's worth? Snap one photo. Loot Check tells you what the item is, what it's realistically worth secondhand, and where to sell it — in seconds.
+Got stuff you might sell but no idea what it's worth? Snap one photo. Loot Check identifies the item, estimates what it would sell for secondhand, and tells you where to list it — in seconds.
 
-No account. No sign-up. No ads. Just point your camera at the clutter in your closet and find out what it's actually worth.
+No account. No sign-up. No ads. Just point your camera at the clutter in your closet and start turning it into cash.
 
 HOW IT WORKS
 • Snap a photo — or add a few angles (a close-up of a logo or label helps nail the exact product)
 • Get an instant ID — brand, item type, and condition
-• See what it's worth — an estimated resale price range
+• See an estimated resale price range
 • Find the best place to sell — a recommended marketplace, with a side-by-side look at what you'd actually pocket after fees
 • Copy a ready-to-post listing — a title and description written for you, one tap to copy
 
 FEATURES
-• Photo-based item identification
-• Resale value estimates
-• Smart marketplace recommendations across eBay, Poshmark, Mercari, Depop, Vinted, Facebook Marketplace, and OfferUp
+• AI photo identification — brand, item type, and condition from a single picture
+• Estimated resale value, instantly
+• Marketplace recommendations across eBay, Poshmark, Mercari, Depop, Vinted, Facebook Marketplace, and OfferUp
 • Fee-aware payout comparison so you can see where you net the most
 • Auto-generated listing title and description
 • Add a hint or extra photos for hard-to-identify items
 • No account, no sign-up — just open and scan
 
 A NOTE ON PRICES
-Values shown are estimates to guide your pricing, not guarantees. What an item actually sells for depends on its condition, demand, and timing.
+Prices in Loot Check are AI-generated estimates, meant to help you price with confidence — not appraisals or guarantees. What an item actually sells for depends on its condition, demand, and timing.
 
-Free to use. No ads, no account required. Find out what your stuff is really worth with Loot Check.
+Free to use. No ads, no account required. Find out what your stuff is worth with Loot Check.
 ```
 
 ## Other required fields (reference)
