@@ -89,27 +89,28 @@ export async function handleAnalyzeRequest(
   }
 }
 
+// Loot Check 1.0.0 is live in the App Store and fetches the price over the wire;
+// later builds compute it on-device from the analyze result and never call this.
+// Kept working for those older installs. `confidence`/`source`/`sampleSize` are
+// vestigial — 1.0.0 switches on `confidence` to pick a caption and would render a
+// blank line without it — so they stay on the wire until that build is gone.
+const LEGACY_PRICE_FIELDS = {
+  sampleSize: 0,
+  confidence: "estimate",
+  source: "model_estimate",
+} as const;
+
 export async function handlePriceRequest(
   body: unknown,
 ): Promise<HandlerResponse> {
   const input = (body ?? {}) as Record<string, unknown>;
-  const searchQuery = input.searchQuery;
   const fallback = (input.fallbackEstimate ?? {}) as Record<string, unknown>;
-
-  if (typeof searchQuery !== "string" || searchQuery.trim().length === 0) {
-    return { status: 400, body: { error: "Missing 'searchQuery'" } };
-  }
 
   const low = typeof fallback.low === "number" ? fallback.low : 0;
   const high = typeof fallback.high === "number" ? fallback.high : 0;
 
-  try {
-    const result = await priceItem(searchQuery, { low, high });
-    return { status: 200, body: result as unknown as Record<string, unknown> };
-  } catch (err) {
-    console.error("[price] failed:", err);
-    return { status: 502, body: { error: "Pricing failed" } };
-  }
+  const result = priceItem({ low, high });
+  return { status: 200, body: { ...result, ...LEGACY_PRICE_FIELDS } };
 }
 
 // Public stats: the all-time total scans across everyone, for the app's counter.

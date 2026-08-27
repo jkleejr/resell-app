@@ -123,24 +123,12 @@ export function isValidMediaType(value: string): value is MediaType {
 
 // --- /api/price contract -------------------------------------------------
 
-// Which rung of the pricing ladder produced the number (provenance).
-// exact      = sold comps on the specific query (sampleSize >= 5)
-// comparable = sold comps on a broadened query
-// estimate   = vision model's own estimate, no sales data found
-export const PRICE_CONFIDENCE = ["exact", "comparable", "estimate"] as const;
-export type PriceConfidence = (typeof PRICE_CONFIDENCE)[number];
-
 export interface PriceResult {
   low: number;
   median: number;
   high: number;
-  sampleSize: number;
-  confidence: PriceConfidence;
-  /** "sold_comps" when backed by real data, "model_estimate" on the fallback rung. */
-  source: "sold_comps" | "model_estimate";
 }
 
 export interface PriceRequest {
-  searchQuery: string;
   fallbackEstimate: { low: number; high: number };
 }

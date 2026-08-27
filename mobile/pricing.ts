@@ -1,16 +1,21 @@
-// Client-side Layer 3 (fee math) + routing + provenance labels.
+// Client-side Layer 3 (fee math) + routing.
 // Pure logic — no secrets, no network. Mirrors the PRD marketplace constant.
 
-export type PriceConfidence = "exact" | "comparable" | "estimate";
-
+// The model's resale estimate, normalised for display.
 export type PriceResult = {
   low: number;
   median: number;
   high: number;
-  sampleSize: number;
-  confidence: PriceConfidence;
-  source: "sold_comps" | "model_estimate";
 };
+
+// Whole dollars, low <= high, with a midpoint to anchor the fee comparison.
+export function toPrice(estimate: { low: number; high: number }): PriceResult {
+  const low = Number.isFinite(estimate.low) ? Math.max(0, Math.round(estimate.low)) : 0;
+  let high = Number.isFinite(estimate.high) ? Math.round(estimate.high) : 0;
+  if (high < low) high = low;
+
+  return { low, median: Math.round((low + high) / 2), high };
+}
 
 type Shipping = "local" | "prepaid" | "you_ship";
 type Speed = "fast_local" | "days" | "days_weeks";
@@ -115,16 +120,4 @@ export function marketplaceUrl(name: string): string {
     MARKETPLACE_URLS[name] ??
     `https://www.google.com/search?q=${encodeURIComponent(`sell on ${name}`)}`
   );
-}
-
-// Honest confidence label tied to which ladder rung produced the price.
-export function provenanceLabel(price: PriceResult): string {
-  switch (price.confidence) {
-    case "exact":
-      return `Based on ${price.sampleSize} sold listings of this exact item`;
-    case "comparable":
-      return "Based on similar items (no exact match found)";
-    case "estimate":
-      return "Rough estimate — not based on sold listings";
-  }
 }

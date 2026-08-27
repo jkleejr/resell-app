@@ -32,7 +32,7 @@ Rules:
 - brand: the brand name ONLY if you can identify it with high confidence from a visible logo, label, or unmistakable design. If you are not confident, return an empty string "". Never guess a brand.
 - condition: estimate from visible wear. Default to "good" for a normal used item with no visible damage. Use "new"/"like_new" only with clear evidence (tags attached, pristine surfaces); use "fair"/"poor" only for visible damage or heavy wear.
 - keywords: 3-8 short, lowercase terms a buyer might search for.
-- searchQuery: a short query for finding comparable SOLD listings — brand + item type + key attributes. No punctuation needed.
+- searchQuery: a short query someone would type to find this exact item on a marketplace — brand + item type + key attributes. No punctuation needed.
 - estimatedValueUSD: the RESALE value — what this item would realistically sell for SECONDHAND today (what a buyer would pay a private seller on a resale marketplace), as a whole-dollar range with low < high. This is NOT the original retail/store price and NOT replacement cost; a used item is normally well below retail. Base it on the item type, brand, and apparent condition.
 - specificity: "exact" if you confidently identified a specific brand/model; "generic" if this is a best-effort generic description.
 - listingDescription: 2-4 sentences a seller could post as-is on a marketplace. Friendly and factual: what it is, notable features, and the condition. Do NOT mention price. No markdown, hashtags, or emoji.

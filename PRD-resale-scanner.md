@@ -54,6 +54,16 @@ The single most important distinction in this project: **sold prices vs. asking 
 The app keeps these in separate layers and never blends them into one fake number:
 
 ### Layer 1 — Fair-value anchor (v1, M3)
+
+> **Superseded (Aug 2026).** The sold-comps ladder below was built but never
+> switched on: no `RAPIDAPI_KEY` was ever configured, so the comps lookup
+> returned `null` before issuing a request and 100% of scans landed on the
+> ESTIMATE rung. Rather than ship a "no sales data found" caption describing a
+> lookup that never happened, the ladder and its provenance labels were removed —
+> the model's `estimatedValueUSD` *is* the price now, presented plainly as an
+> estimate. The rest of this section is kept as the design record for whoever
+> revisits real comps; the implementation is in git history.
+
 eBay sold comps. The one trustworthy "what it's worth" number. Produced by the **pricing fallback ladder**:
 
 ```

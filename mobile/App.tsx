@@ -16,12 +16,7 @@ import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as Clipboard from "expo-clipboard";
 import { BACKEND_URL } from "./config";
 import { getDeviceId } from "./device";
-import {
-  buildComparison,
-  provenanceLabel,
-  speedLabel,
-  type PriceResult,
-} from "./pricing";
+import { buildComparison, speedLabel, toPrice } from "./pricing";
 
 // Mirrors the backend /api/analyze contract (lib/schema.ts).
 type AnalyzeResult = {
@@ -41,7 +36,6 @@ type AnalyzeResult = {
 
 type CapturedImage = { uri: string; base64: string };
 type Status = "idle" | "working" | "done" | "error";
-type PriceStatus = "idle" | "loading" | "done" | "error";
 
 // Up to this many photos per scan — an overall shot plus a logo/label close-up
 // dramatically improves identification. Keep in sync with MAX_IMAGES in the
@@ -64,8 +58,6 @@ export default function App() {
   const [hint, setHint] = useState("");
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [priceStatus, setPriceStatus] = useState<PriceStatus>("idle");
-  const [price, setPrice] = useState<PriceResult | null>(null);
   const [copiedField, setCopiedField] = useState<"title" | "listing" | null>(
     null,
   );
@@ -150,8 +142,6 @@ export default function App() {
     if (images.length === 0) return;
     setError(null);
     setResult(null);
-    setPrice(null);
-    setPriceStatus("idle");
     setStatus("working");
 
     try {
@@ -177,7 +167,6 @@ export default function App() {
       const data = (await res.json()) as AnalyzeResult;
       setResult(data);
       setStatus("done");
-      void fetchPrice(data);
       void fetchStats(); // the global counter just ticked up
 
     } catch (e) {
@@ -188,33 +177,12 @@ export default function App() {
     }
   }
 
-  async function fetchPrice(item: AnalyzeResult) {
-    setPriceStatus("loading");
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/price`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          searchQuery: item.searchQuery,
-          fallbackEstimate: item.estimatedValueUSD,
-        }),
-      });
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-      setPrice((await res.json()) as PriceResult);
-      setPriceStatus("done");
-    } catch {
-      setPriceStatus("error");
-    }
-  }
-
   // Back to the compose screen, KEEPING the current photos + hint so the user
   // can add a logo/label shot and identify again. Used by the "generic" nudge.
   function refine() {
     setStatus("idle");
     setResult(null);
     setError(null);
-    setPrice(null);
-    setPriceStatus("idle");
     setCopiedField(null);
   }
 
@@ -225,10 +193,11 @@ export default function App() {
     setHint("");
     setResult(null);
     setError(null);
-    setPrice(null);
-    setPriceStatus("idle");
     setCopiedField(null);
   }
+
+  // The price is the model's estimate from the analyze call — no second request.
+  const price = result ? toPrice(result.estimatedValueUSD) : null;
 
   const comparison =
     price && result
@@ -370,22 +339,12 @@ export default function App() {
             {/* Price */}
             <View style={styles.card}>
               <Text style={styles.sectionLabel}>Estimated resale value</Text>
-              {priceStatus === "loading" && (
-                <View style={styles.priceLoading}>
-                  <ActivityIndicator color="#fff" />
-                  <Text style={styles.muted}>Pricing…</Text>
-                </View>
-              )}
-              {priceStatus === "error" && (
-                <Text style={styles.muted}>Couldn't fetch a price right now.</Text>
-              )}
-              {priceStatus === "done" && price && (
+              {price && (
                 <>
                   <Text style={styles.price}>${price.median}</Text>
                   <Text style={styles.priceRange}>
                     resells for ${price.low}–${price.high}
                   </Text>
-                  <Text style={styles.provenance}>{provenanceLabel(price)}</Text>
                 </>
               )}
             </View>
@@ -695,10 +654,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: "uppercase",
   },
-  priceLoading: { flexDirection: "row", alignItems: "center", gap: 10 },
   price: { color: "#fff", fontSize: 38, fontWeight: "800" },
   priceRange: { color: "#A8A8B0", fontSize: 15 },
-  provenance: { color: "#7A7A86", fontSize: 13, fontStyle: "italic", marginTop: 2 },
   recLead: { color: "#4ADE80", fontSize: 17, fontWeight: "700" },
   reason: { color: "#C8C8D0", fontSize: 14, lineHeight: 20 },
   speed: { color: "#A8A8B0", fontSize: 13, marginBottom: 6 },

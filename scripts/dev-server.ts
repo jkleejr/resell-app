@@ -77,9 +77,6 @@ server.listen(PORT, () => {
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn("⚠  ANTHROPIC_API_KEY is not set — /api/analyze will return 500.");
   }
-  if (!process.env.RAPIDAPI_KEY) {
-    console.warn("ℹ  RAPIDAPI_KEY not set — prices use the model estimate (no sold comps yet).");
-  }
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
     console.warn("ℹ  Upstash not set — scan cap is OFF and the global counter won't increment (fine locally).");
   }

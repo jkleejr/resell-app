@@ -27,12 +27,12 @@ Required for every update; it's the one listing field a new version forces you t
 
 ```
 • A new app icon and a refreshed launch screen
-• Clearer wording on prices, so it's obvious at a glance when a value is an estimate rather than a match against real sales
+• A simpler, faster price card — your estimated resale range now appears instantly with the result
 ```
 
 ### Release-note history
 
-- **1.0.1** — new icon + launch screen; clearer price-estimate wording.
+- **1.0.1** — new icon + launch screen; price shown instantly with the result.
 - **1.0.0** — initial release.
 
 ## Description (max 4000)
