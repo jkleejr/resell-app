@@ -1,7 +1,7 @@
 # App Store listing — Loot Check
 
 Copy each field into the matching App Store Connect field.
-Current submission: **1.0.1** (build auto-increments remotely; last shipped was 1.0.0 build 2, 30 Jun 2026).
+Current submission: **1.0.2** (build auto-increments remotely; last shipped was 1.0.0 build 2, 30 Jun 2026).
 
 ## App Name (max 30)
 Loot Check
@@ -25,16 +25,22 @@ resell,resale,declutter,thrift,flip,ebay,poshmark,mercari,depop,price,value,seco
 Paste into App Store Connect → the new version's **What's New in This Version** field.
 Required for every update; it's the one listing field a new version forces you to fill in.
 
+> **Written for users coming from 1.0.0.** If 1.0.1 was approved and released before
+> 1.0.2 goes out, drop the last two bullets — those users already have them.
+
 ```
-• A new app icon and a refreshed launch screen
+• A new app icon
+• A refreshed launch screen
 • Faster results — your estimated resale value now appears the moment the item is identified
 • A cleaner price card
 ```
 
 ### Release-note history
 
+- **1.0.2** — new app icon (second revision of the scan-tag mark).
 - **1.0.1** — new icon + launch screen; price now renders instantly on-device
   (the sold-comps lookup that never shipped was removed along with its caption).
+  Submitted 28 Aug 2026; superseded by 1.0.2 if it was still in review.
 - **1.0.0** — initial release.
 
 ## Description (max 4000)
@@ -84,15 +90,20 @@ Free to use. No ads, no account required. Find out what your stuff is worth with
 Most listing metadata carries over from the last version untouched. These are the
 things a new version actually makes you handle:
 
-- [ ] **Version string** — `mobile/app.json` → `expo.version` is `1.0.1`. The build
+- [ ] **Clear the decks** — a version can only be in review one at a time. If 1.0.1
+      is still "Waiting for Review" or "In Review", remove it from review in App Store
+      Connect first, then create the 1.0.2 version. If it was already approved and
+      released, just add 1.0.2 on top.
+- [ ] **Version string** — `mobile/app.json` → `expo.version` is `1.0.2`. The build
       number is managed remotely (`appVersionSource: "remote"` in `eas.json`) and
-      `autoIncrement` bumps it to 3 on the next production build. Don't set it by hand.
+      `autoIncrement` bumps it on the next production build. Don't set it by hand.
 - [ ] **New build** — the icon lives in the binary, so this needs `eas build -p ios
       --profile production`, not an OTA update. Then `eas submit -p ios`.
 - [ ] **What's New** — paste the block above. Mandatory field on every update.
-- [ ] **Screenshots** — no change needed. `App.tsx` hasn't been touched since the
-      1.0.0 build, and the app UI never renders the icon asset, so the existing
-      screenshots still match what a reviewer will see.
+- [ ] **Screenshots** — no change needed for the icon. The app UI never renders the
+      icon asset, so the existing screenshots still match what a reviewer sees.
+      (Screenshot 3 may still show the removed price caption from before 1.0.1 —
+      worth a look, but not a blocker.)
 - [ ] **Export compliance** — already declared in `app.json`
       (`ITSAppUsesNonExemptEncryption: false`), so App Store Connect won't re-ask.
 - [ ] **App Privacy** — unchanged. No new data is collected in this version; the
@@ -107,8 +118,8 @@ things a new version actually makes you handle:
 
 ### Note on runtime version
 
-`app.json` sets `runtimeVersion.policy: "appVersion"`. Bumping to 1.0.1 starts a new
-OTA channel: updates published for 1.0.0 will no longer reach 1.0.1 installs, and
+`app.json` sets `runtimeVersion.policy: "appVersion"`. Bumping to 1.0.2 starts a new
+OTA channel: updates published for 1.0.0 will no longer reach 1.0.2 installs, and
 vice versa. Expected — just don't expect an OTA to patch both at once.
 
 ## App Privacy questionnaire (App Store Connect → App Privacy)
