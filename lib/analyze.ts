@@ -35,7 +35,11 @@ Rules:
 - searchQuery: a short query someone would type to find this exact item on a marketplace — brand + item type + key attributes. No punctuation needed.
 - estimatedValueUSD: the RESALE value — what this item would realistically sell for SECONDHAND today (what a buyer would pay a private seller on a resale marketplace), as a whole-dollar range with low < high. This is NOT the original retail/store price and NOT replacement cost; a used item is normally well below retail. Base it on the item type, brand, and apparent condition.
 - specificity: "exact" if you confidently identified a specific brand/model; "generic" if this is a best-effort generic description.
-- listingDescription: 2-4 sentences a seller could post as-is on a marketplace. Friendly and factual: what it is, notable features, and the condition. Do NOT mention price. No markdown, hashtags, or emoji.
+- listingDescription: 1-3 short sentences the seller pastes straight into a listing, unedited. This is buyer-facing copy, NOT your analysis of the photo. Write only plain statements of fact about the item: what it is, its colour, material, size, and condition.
+  • Never hedge. Do not write "appears to be", "looks like", "seems", "possibly", "presumably", "hard to tell", or any remark that a label is unreadable or the item unidentified. Your uncertainty is already reported in brand and specificity; it must never appear in this text.
+  • When you are unsure, become LESS SPECIFIC — never less certain. Drop the detail you can't verify and state what you can. "Glass bottle of golden facial oil with a white cap, travel size" is correct when the label is illegible; "what appears to be an oil or serum, label not clearly legible" is not.
+  • No sales pitch, no imagined buyer, no filler. Cut "ideal for", "perfect for", "great for anyone who", "a must-have".
+  • Do NOT mention price, shipping, returns, or payment. No markdown, hashtags, or emoji.
 - recommendedPlatform: the SINGLE marketplace where THIS specific item is most likely to actually sell, and sell quickly. Choose from: Facebook Marketplace, OfferUp, Vinted, Depop, Mercari, eBay, Poshmark. Use where the buyers for this item actually are:
   • Facebook Marketplace / OfferUp — local pickup. Best for bulky/heavy items (furniture, appliances) and low-value items where shipping isn't worth it.
   • eBay — shippable items buyers search for by brand/model: electronics, collectibles, parts, media, tools, branded gear. Widest buyer base.
@@ -44,7 +48,9 @@ Rules:
 - recommendationReason: ONE short sentence, specific to this item, on why that platform is the best place to sell it.
 - expectedSpeed: how quickly it is likely to sell on that platform — "fast" (days), "moderate" (a couple of weeks), or "slow" (a month or more / niche demand).
 
-If the photo is blurry, dark, partial, or ambiguous: describe the item generically, set brand to "", set specificity to "generic", and give a WIDE price range. Degrade gracefully — do NOT invent a brand or model you cannot actually see.`;
+If the photo is blurry, dark, partial, or ambiguous: describe the item generically, set brand to "", set specificity to "generic", and give a WIDE price range. Degrade gracefully — do NOT invent a brand or model you cannot actually see.
+
+That degrading happens in the DATA fields — brand, specificity, and the price range carry your uncertainty. The title and listingDescription stay clean either way: they get shorter and more general, never hedged. A seller must be able to post them without editing a word.`;
 
 export interface ImageInput {
   /** base64-encoded image data, no `data:` prefix. */
