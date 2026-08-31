@@ -31,10 +31,14 @@ export const SPECIFICITY = ["exact", "generic"] as const;
 export const VALUATION_BASIS = ["resale", "original"] as const;
 
 // The model's own read on whether looking the item up would materially change
-// its number. This is what gates the optional web-search pass in lib/verify.ts:
-// searching is worth a cent where the model's pretrained knowledge is THIN, not
-// where identification is sharp. A Levi's 501 is "high" (deep, stable market it
-// already knows); a hand-thrown mug or a niche collectible is "low".
+// its number. A Levi's 501 is "high" (a deep, stable market it already knows);
+// a hand-thrown mug or a niche collectible is "low".
+//
+// This once gated the web-search pass, but no longer spends money — see
+// shouldVerify() in lib/handler.ts for why the gate narrowed to originals. It
+// is still emitted and logged: it costs two tokens, and it is the only record
+// of which scans the model itself considered a guess, which is worth having
+// when the time comes to check prices against what things actually sold for.
 export const PRICE_CONFIDENCE = ["high", "low"] as const;
 
 // Where the price we return actually came from. Set by the SERVER, never by the

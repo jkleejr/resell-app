@@ -111,22 +111,31 @@ const VERIFY_MIN_USD = Number(process.env.VERIFY_MIN_USD ?? 40);
 /**
  * Decide whether one web search is worth a cent for this item.
  *
- * The deciding signals come from the MODEL, in the call we already made:
- * `valuationBasis` and `priceConfidence` are both declared before the price, so
- * by the time we get here the model has already told us whether it was working
- * from a market it knows.
+ * Originals only — and the reason is about what the web can actually tell us,
+ * not about how confident the model feels.
  *
- * The important thing is which way this points. The obvious gate — verify the
- * items we identified precisely — is backwards: a confidently identified Levi's
- * 501 is exactly the item whose price the model already knows cold, and paying
- * to look it up buys almost nothing. Search earns its cent where pretrained
- * knowledge is THIN: one-of-a-kind pieces with no market to memorise, and
- * anything the model itself flags as a guess.
+ * A live run made this concrete. Searching a used pair of Levi's returned only
+ * active listings and no sold data, and the model correctly refused to price
+ * from them: a used item has a real going rate, and asking prices sit above it,
+ * so a marketplace full of hopeful listings would have overstated exactly the
+ * number the seller came for. The search cost a cent and taught us nothing,
+ * because the sold data it needed is not on the open web.
+ *
+ * An original piece inverts that. It has never been sold, so there is no
+ * clearing price to discover and no sale history to miss. The seller is SETTING
+ * a price, and what comparable makers currently ask is precisely the evidence
+ * that decision needs — which is the one thing a web search is good at. The
+ * model has no memorised market for a hand-thrown mug or a stranger's painting
+ * either, so this is also where its own knowledge is thinnest.
+ *
+ * `priceConfidence` used to widen this gate to anything the model flagged as a
+ * guess. That is what pulled the jeans in. The field is still emitted and still
+ * worth logging, but it no longer spends money.
  */
 function shouldVerify(r: AnalyzeResult): boolean {
   if (process.env.PRICE_VERIFY !== "on") return false;
   if (r.estimatedValueUSD.high < VERIFY_MIN_USD) return false;
-  return r.valuationBasis === "original" || r.priceConfidence === "low";
+  return r.valuationBasis === "original";
 }
 
 // Cache identity: what makes two scans "the same item" for pricing purposes.

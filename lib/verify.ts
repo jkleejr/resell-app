@@ -25,7 +25,13 @@ const MODEL = process.env.VERIFY_MODEL ?? "claude-sonnet-4-6";
 // Total wall-clock budget for the whole verification, including the search.
 // Past this we abandon it and serve the estimate — a slow scan is a worse
 // product than an unverified one.
-const TIMEOUT_MS = Number(process.env.VERIFY_TIMEOUT_MS ?? 9_000);
+//
+// Measured: a search plus both inference passes takes 8-15s. The first budget
+// here was 9s, which cut off most of its own successes. 20s clears the observed
+// range with room to spare; it is generous on purpose, because this only ever
+// runs on originals and a timeout there means falling back to a number with no
+// market behind it at all.
+const TIMEOUT_MS = Number(process.env.VERIFY_TIMEOUT_MS ?? 20_000);
 
 // Basic (direct) web search rather than the newer dynamic-filtering versions.
 // Dynamic filtering runs the search from inside code execution and would cut
@@ -62,26 +68,45 @@ const ORIGINAL_DOMAINS = [
 // print instead of an original. Discard rather than trust it.
 const SANITY_FACTOR = 3;
 
+// The two modes differ on one question: is an ASKING price useful evidence?
+//
+// For a mass-produced used item, no. There is a real clearing price to find, and
+// asking prices sit systematically above it — marketplaces are full of hopeful
+// listings that never sell. Pricing a used item off them overstates what the
+// seller will actually get, which is the one number they came for.
+//
+// For a one-of-a-kind piece, yes — and it is the only evidence there is. The
+// piece has never been sold and never will be until this sale, so there is no
+// clearing price to discover. The seller is SETTING a price, and the real
+// question is what comparable makers ask. That is exactly what listings show.
 const RESALE_TASK = `Search ONCE for what this item has actually SOLD for recently on the secondhand market.
 
-You want completed/sold prices from private sellers. Ignore new and retail prices — the retail price of a product tells you almost nothing about what a used one fetches, and anchoring on it is the specific mistake this check exists to catch.`;
+You want completed or sold prices from private sellers. Active listings are NOT evidence here: a marketplace is full of hopeful prices that never found a buyer, and this item has a real going rate that asking prices sit above. If the search returns only active listings and no sold data, that is a "low" confidence result — say so and keep the existing estimate.
 
-const ORIGINAL_TASK = `This is a one-of-a-kind piece made by the person selling it. There is no comparable sale for this exact piece and you should not look for one.
+Ignore new and retail prices entirely. What a product costs new tells you almost nothing about what a used one fetches.`;
 
-Search ONCE for what COMPARABLE original work currently sells for: same medium, similar size, an independent maker without an established name or following. You are calibrating a price band for work of this kind, not finding a match for this piece.
+const ORIGINAL_TASK = `This is a one-of-a-kind piece made by the person selling it. It has never been sold, so there is no sale history to find and you should not look for one.
 
-Assume the maker has no established sales history unless told otherwise. Their audience, not the object, drives the top of the range.`;
+Search ONCE for what COMPARABLE original work is currently LISTED at: same medium, similar size, an independent maker without an established name. Asking prices are the right evidence here — the seller is deciding what to charge, and what similar makers ask is exactly the information that decision needs. Do not discard results for being active listings rather than completed sales.
+
+Search the CATEGORY of work, not its subject. What a piece depicts barely moves its price — a shark and a harbour scene by comparable makers, same medium and size, sell for about the same. Searching the subject narrows you to a handful of listings whose prices may not even be visible; searching medium, size and maker tier finds the band you actually need. "original acrylic painting 16x20 canvas independent artist" is a good query. "original acrylic shark painting" is not.
+
+Assume the maker has no established following unless told otherwise. Their audience, not the object, drives the top of the range.`;
+
+// How to turn what the search found into a number. Shared, because the
+// discipline is the same either way: interpret the spread, don't report it.
+const REPORTING_RULES = `Then report, in this order:
+- findings: what the search actually showed — the prices you saw and where. One or two sentences. If the results were thin, off-target, or about a different item, say so plainly.
+- confidence: "high" only if the results genuinely support a price band for this item. "low" if they were thin, irrelevant, or about a different product. When in doubt choose "low": the existing estimate is kept and nothing is lost. An unhelpful search is a normal outcome and reporting it honestly is correct.
+- rangeUSD: NOT the raw spread of what you found. The cheapest listing is usually an outlier and so is the dearest — one is a bargain or a mistake, the other is someone hoping. Trim both ends and give the band where a piece like this would realistically change hands: above the lowest asking price, below the highest, and drawn from the bulk of what you saw in the middle. Widen it a little when the results were thin, because a thin sample deserves an honest band — but a range so wide it spans every possibility tells the seller nothing. If confidence is "low", repeat the existing estimate unchanged.
+- note: ONE short factual line telling the seller what backs the number, under 60 characters. Name the evidence honestly: say "listed at" for active listings and "sold for" ONLY for completed sales. "Based on similar originals listed at $40-90" and "Based on 4 recent sold listings" are both good. Never call an asking price a sale.`;
 
 function buildSystemPrompt(basis: AnalyzeResult["valuationBasis"]): string {
   return `You are checking a price estimate against current market information. You get exactly one web search.
 
 ${basis === "original" ? ORIGINAL_TASK : RESALE_TASK}
 
-Then report, in this order:
-- findings: what the search actually showed — the prices you saw and where. One or two sentences. If the results were thin, off-target, or retail rather than resale, say so plainly.
-- confidence: "high" ONLY if the results genuinely support a price band for this item. "low" if they were thin, irrelevant, retail rather than secondhand, or about a different product. When in doubt choose "low": the existing estimate is kept and nothing is lost. An unhelpful search is normal and reporting it honestly is the correct outcome.
-- rangeUSD: your refined whole-dollar range, low < high. If confidence is "low", repeat the existing estimate unchanged.
-- note: ONE short factual line telling the seller what backs the number, under 60 characters. For example "Based on 4 recent sold listings" or "Based on comparable originals on Etsy". State the source, not the price. Never hedge.`;
+${REPORTING_RULES}`;
 }
 
 // A compact text description of the item. This is the whole reason the second
@@ -189,7 +214,7 @@ function interpret(
     // the expensive one — we paid for the search and kept the estimate anyway —
     // so this line is the only way to tell an unhelpful search (nothing indexed,
     // wrong market) from an unhelpfully strict bar.
-    console.log(`[verify] low confidence: ${String(r.findings ?? "").slice(0, 300)}`);
+    console.log(`[verify] low confidence: ${String(r.findings ?? "").slice(0, 600)}`);
     return null;
   }
 
