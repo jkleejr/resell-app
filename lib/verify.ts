@@ -184,7 +184,14 @@ function interpret(
   )
     ? (r.confidence as string)
     : "low";
-  if (confidence !== "high") return null;
+  if (confidence !== "high") {
+    // Log what the search actually turned up. A discard is the common case and
+    // the expensive one — we paid for the search and kept the estimate anyway —
+    // so this line is the only way to tell an unhelpful search (nothing indexed,
+    // wrong market) from an unhelpfully strict bar.
+    console.log(`[verify] low confidence: ${String(r.findings ?? "").slice(0, 300)}`);
+    return null;
+  }
 
   const range = (r.rangeUSD ?? {}) as Record<string, unknown>;
   const low = Math.round(toFinite(range.low));
