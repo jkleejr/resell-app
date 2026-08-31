@@ -361,11 +361,21 @@ export default function App() {
                     {isOriginal ? "could ask" : "resells for"} ${price.low}–$
                     {price.high}
                   </Text>
-                  {result.priceBasis === "verified" && (
-                    <Text style={styles.priceNote}>
-                      ✓ {result.priceNote || "Checked against current listings"}
+                  {/* Green tick only when listings actually backed the number.
+                      A failed lookup still gets its line, in muted grey — it
+                      explains the extra wait without dressing up as evidence. */}
+                  {result.priceNote ? (
+                    <Text
+                      style={
+                        result.priceBasis === "verified"
+                          ? styles.priceNote
+                          : styles.priceNoteMuted
+                      }
+                    >
+                      {result.priceBasis === "verified" ? "✓ " : ""}
+                      {result.priceNote}
                     </Text>
-                  )}
+                  ) : null}
                 </>
               )}
             </View>
@@ -679,6 +689,7 @@ const styles = StyleSheet.create({
   priceRange: { color: "#A8A8B0", fontSize: 15 },
   // Same green as the "best platform" lead — this line means "we checked".
   priceNote: { color: "#4ADE80", fontSize: 13, marginTop: 8 },
+  priceNoteMuted: { color: "#8A8A93", fontSize: 13, marginTop: 8 },
   recLead: { color: "#4ADE80", fontSize: 17, fontWeight: "700" },
   reason: { color: "#C8C8D0", fontSize: 14, lineHeight: 20 },
   speed: { color: "#A8A8B0", fontSize: 13, marginBottom: 6 },

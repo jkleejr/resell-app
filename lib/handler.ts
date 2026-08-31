@@ -176,11 +176,20 @@ async function maybeVerifyPrice(result: AnalyzeResult): Promise<AnalyzeResult> {
     return applyVerified(result, cached);
   }
 
-  // Only now do we spend. Fails closed: no budget, no search.
+  // Only now do we spend. Fails closed: no budget, no search. No note either —
+  // nothing was attempted, so there is nothing to tell the seller about.
   if (!(await claimSearchBudget())) return result;
 
   const verified = await verifyPrice(result);
-  if (!verified) return result;
+  if (!verified) {
+    // We searched and came back empty. Say so plainly and briefly: the scan
+    // just took ten seconds longer than usual and the seller deserves to know
+    // why, without a tour of which marketplaces were tried. WHICH site failed
+    // is our problem, not theirs — "no eBay results" invites them to wonder
+    // whether eBay is broken. priceBasis stays "estimate" because the number
+    // is still the model's own.
+    return { ...result, priceNote: "Couldn't find listings" };
+  }
 
   await cacheVerification(key, verified);
   return applyVerified(result, verified);
