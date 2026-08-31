@@ -45,6 +45,26 @@ export const PRICE_CONFIDENCE = ["high", "low"] as const;
 // model: "verified" only after lib/verify.ts successfully refined the range.
 export const PRICE_BASIS = ["estimate", "verified"] as const;
 
+// How well an original piece is executed, judged from the photo.
+//
+// The market for handmade work is not one band, it is TIERS — a search for
+// "shark painting price" comes back with prints at $3-35, decorative canvases
+// at $45-150, handmade work at $400-1,700, and gallery pieces above that. The
+// whole valuation problem is picking the right tier, and the only evidence for
+// that is what the piece looks like.
+//
+// This has to be judged in the vision call, because the verification pass that
+// searches for those tiers is text-only and never sees the photo. So the model
+// grades the work here, and the searched tiers are matched against that grade
+// there. "not_applicable" for anything that isn't an original.
+export const CRAFT_LEVEL = [
+  "not_applicable",
+  "basic",
+  "competent",
+  "accomplished",
+  "professional",
+] as const;
+
 // Marketplaces the model may recommend. MUST match the platform names in
 // mobile/pricing.ts exactly — the client highlights the row by name.
 export const PLATFORM_NAMES = [
@@ -68,6 +88,7 @@ export type ExpectedSpeed = (typeof EXPECTED_SPEED)[number];
 export type ValuationBasis = (typeof VALUATION_BASIS)[number];
 export type PriceConfidence = (typeof PRICE_CONFIDENCE)[number];
 export type PriceBasis = (typeof PRICE_BASIS)[number];
+export type CraftLevel = (typeof CRAFT_LEVEL)[number];
 
 export interface AnalyzeResult {
   title: string;
@@ -84,6 +105,9 @@ export interface AnalyzeResult {
   valuationBasis: ValuationBasis;
   /** Also before the price: the model's own read on whether it's guessing. */
   priceConfidence: PriceConfidence;
+  /** Execution quality of an original, judged from the photo. Picks the market
+   *  tier the piece belongs in. "not_applicable" for resale items. */
+  craftLevel: CraftLevel;
   estimatedValueUSD: { low: number; high: number };
   /** Ready-to-post marketplace description, generated in the same vision call. */
   listingDescription: string;
@@ -159,6 +183,7 @@ export const ANALYZE_SCHEMA = {
     specificity: { type: "string", enum: [...SPECIFICITY] },
     valuationBasis: { type: "string", enum: [...VALUATION_BASIS] },
     priceConfidence: { type: "string", enum: [...PRICE_CONFIDENCE] },
+    craftLevel: { type: "string", enum: [...CRAFT_LEVEL] },
     estimatedValueUSD: {
       type: "object",
       additionalProperties: false,
@@ -183,6 +208,7 @@ export const ANALYZE_SCHEMA = {
     "specificity",
     "valuationBasis",
     "priceConfidence",
+    "craftLevel",
     "estimatedValueUSD",
     "listingDescription",
     "recommendedPlatform",

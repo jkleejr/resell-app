@@ -5,6 +5,7 @@ import {
   CONDITIONS,
   EXPECTED_SPEED,
   PLATFORM_NAMES,
+  CRAFT_LEVEL,
   PRICE_CONFIDENCE,
   SPECIFICITY,
   VALUATION_BASIS,
@@ -40,6 +41,13 @@ Rules:
 - specificity: "exact" if you confidently identified a specific brand/model; "generic" if this is a best-effort generic description.
 - valuationBasis: "original" ONLY when this is a one-of-a-kind piece being sold by the person who made it — an original artwork, a handmade or handcrafted object, a custom-built piece. Everything else is "resale". Default to "resale" and require real evidence to leave it: visible brushwork or impasto, raw or stapled canvas edges, a hand-written signature, tool marks, glaze irregularities, an unfinished back or underside. A mass-produced print, a factory-made decorative object, or a piece the user is flipping rather than made is "resale". If the user's hint says they made it, believe them.
 - priceConfidence: your own honest read on whether checking current listings would materially change your number. "high" when you know this market well — a common branded product with a deep, stable secondhand market. "low" when your knowledge is thin, stale, or the market is volatile: one-of-a-kind pieces, niche collectibles, small or fast-moving markets. "low" is not a failure and it costs the seller nothing; claiming "high" on a market you barely know does cost them.
+- craftLevel: for an original piece ONLY, how well it is executed. "not_applicable" whenever valuationBasis is "resale".
+  • The market for handmade work comes in tiers, not one band. Search a subject like "shark painting" and you find prints around $3-35, decorative canvases around $45-150, substantial handmade work around $400-1,700, and gallery pieces well above that. Which tier a piece belongs to is the whole valuation, and the photo is the only evidence for it.
+  • "basic" — simple, quickly made, beginner work. Flat colour, little detail, visible unsteadiness.
+  • "competent" — solid amateur work with real care taken. Controlled technique, deliberate composition, finished properly. Most things people make at home land here.
+  • "accomplished" — clear skill and substantial time. Confident technique, considered composition, would hold its own hung in a room among bought art.
+  • "professional" — gallery standard. The work of someone who does this for a living.
+  Grade the WORK, not the subject or your taste in it. Be honest and be willing to use the middle: inflating this inflates the price, and a seller who prices a competent piece as a professional one simply never sells it.
 - estimatedValueUSD: a whole-dollar range with low < high. What that number MEANS depends on valuationBasis:
   • "resale" — the RESALE value: what this item would realistically sell for SECONDHAND today (what a buyer would pay a private seller on a resale marketplace). This is NOT the original retail/store price and NOT replacement cost; a used item is normally well below retail. Base it on the item type, brand, and apparent condition.
   • "original" — the PRIMARY asking price: what the maker could realistically ask. Do NOT discount from retail — there is no retail, this piece has never been sold, and the seller IS the primary market. Anchor on medium, size, execution, and finish. For 2D artwork a common convention is (height + width in inches) × roughly $1-4 per inch for a maker with no established sales history. Assume no established following unless told otherwise, and keep the range wide: the maker's audience, not the object, drives the top end.
@@ -155,6 +163,7 @@ function normalize(raw: unknown): AnalyzeResult {
   // relabel someone's used jacket as an original work.
   const valuationBasis = oneOf(r.valuationBasis, VALUATION_BASIS, "resale");
   const priceConfidence = oneOf(r.priceConfidence, PRICE_CONFIDENCE, "high");
+  const craftLevel = oneOf(r.craftLevel, CRAFT_LEVEL, "not_applicable");
 
   const value = (r.estimatedValueUSD ?? {}) as Record<string, unknown>;
   let low = toFiniteNumber(value.low, 0);
@@ -178,6 +187,7 @@ function normalize(raw: unknown): AnalyzeResult {
     specificity,
     valuationBasis,
     priceConfidence,
+    craftLevel,
     estimatedValueUSD: { low: Math.round(low), high: Math.round(high) },
     listingDescription: cleanText(r.listingDescription),
     recommendedPlatform: oneOf(r.recommendedPlatform, PLATFORM_NAMES, "eBay"),

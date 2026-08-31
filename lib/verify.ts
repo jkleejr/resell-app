@@ -53,14 +53,29 @@ const RESALE_DOMAINS = [
   "therealreal.com",
 ];
 
-// Originals are priced against what comparable independent work asks, so the
-// useful sources are primary marketplaces for makers, not resale marketplaces.
-const ORIGINAL_DOMAINS = [
-  "etsy.com",
-  "saatchiart.com",
-  "artfinder.com",
-  "singulart.com",
-  "fineartamerica.com",
+// Originals are searched broadly, with only the print farms blocked.
+//
+// Pinning the search to a handful of art marketplaces was actively harmful:
+// their category pages don't expose prices to a search index, so the search
+// found the market and couldn't read a number out of it. Searching broadly
+// fixes that — the plain consumer query returns shopping results that do carry
+// prices.
+//
+// But broad is not unrestricted. These sellers deal in mass-produced canvas
+// prints, and a print is the one thing an original is definitionally not:
+// their prices describe a $20 poster of a painting, not a painting. Letting
+// them through also puts "Amazon, Walmart" in the provenance note under a
+// price labelled ORIGINAL, which reads as nonsense to the seller even when the
+// number happens to land right.
+const ORIGINAL_BLOCKED_DOMAINS = [
+  "amazon.com",
+  "walmart.com",
+  "wayfair.com",
+  "elephantstock.com",
+  "icanvas.com",
+  "displate.com",
+  "society6.com",
+  "redbubble.com",
 ];
 
 // A refined range this far from the model's own estimate almost always means
@@ -87,9 +102,21 @@ Ignore new and retail prices entirely. What a product costs new tells you almost
 
 const ORIGINAL_TASK = `This is a one-of-a-kind piece made by the person selling it. It has never been sold, so there is no sale history to find and you should not look for one.
 
-Search ONCE for what COMPARABLE original work is currently LISTED at: same medium, similar size, an independent maker without an established name. Asking prices are the right evidence here — the seller is deciding what to charge, and what similar makers ask is exactly the information that decision needs. Do not discard results for being active listings rather than completed sales.
+Search ONCE, the way a person would: the SUBJECT, the kind of object, and the word "price". "shark painting price", "stoneware mug price", "handmade wooden bowl price". Nothing clever, no size or artist qualifiers.
 
-Search the CATEGORY of work, not its subject. What a piece depicts barely moves its price — a shark and a harbour scene by comparable makers, same medium and size, sell for about the same. Searching the subject narrows you to a handful of listings whose prices may not even be visible; searching medium, size and maker tier finds the band you actually need. "original acrylic painting 16x20 canvas independent artist" is a good query. "original acrylic shark painting" is not.
+The subject is the part that must not be dropped. It is what makes the search return finished pieces for sale rather than the materials they were made from — query "acrylic painting price" and you get sets of acrylic paint; query "shark painting price" and you get shark paintings. Lead with what the thing depicts or is, and let the medium follow if it helps.
+
+That phrasing matters more than it looks. A precise query like "original acrylic painting 16x20 independent artist" returns marketplace category pages with no prices visible in them at all. The plain consumer question returns shopping results and price breakdowns with actual numbers, because that is the question the web is organised to answer. Asking prices are the right evidence here: the seller is deciding what to charge, and what comparable work asks is exactly what that decision needs.
+
+What comes back will be TIERS, not one band. A search for shark paintings returns roughly: mass-produced prints at $3-35, decorative canvases at $45-150, substantial handmade work at $400-1,700, and gallery pieces above that. Report those tiers in findings, with their prices.
+
+Your job is then to place THIS piece in the right tier. You are told its craft level, judged from the photo by a model that could see it:
+- "basic" — the bottom of the handmade range, near decorative-print money.
+- "competent" — solid amateur work. Usually the decorative-canvas tier, NOT the substantial-handmade tier. This is where most home-made work belongs.
+- "accomplished" — the upper handmade range.
+- "professional" — gallery tier.
+
+Placing a competent piece in the professional tier is the failure mode to avoid: it produces a price nobody pays and the piece never sells. When the craft level sits between two tiers, take the lower one.
 
 Assume the maker has no established following unless told otherwise. Their audience, not the object, drives the top of the range.`;
 
@@ -98,8 +125,8 @@ Assume the maker has no established following unless told otherwise. Their audie
 const REPORTING_RULES = `Then report, in this order:
 - findings: what the search actually showed — the prices you saw and where. One or two sentences. If the results were thin, off-target, or about a different item, say so plainly.
 - confidence: "high" only if the results genuinely support a price band for this item. "low" if they were thin, irrelevant, or about a different product. When in doubt choose "low": the existing estimate is kept and nothing is lost. An unhelpful search is a normal outcome and reporting it honestly is correct.
-- rangeUSD: NOT the raw spread of what you found. The cheapest listing is usually an outlier and so is the dearest — one is a bargain or a mistake, the other is someone hoping. Trim both ends and give the band where a piece like this would realistically change hands: above the lowest asking price, below the highest, and drawn from the bulk of what you saw in the middle. Widen it a little when the results were thin, because a thin sample deserves an honest band — but a range so wide it spans every possibility tells the seller nothing. If confidence is "low", repeat the existing estimate unchanged.
-- note: ONE short factual line telling the seller what backs the number, under 60 characters. Name the evidence honestly: say "listed at" for active listings and "sold for" ONLY for completed sales. "Based on similar originals listed at $40-90" and "Based on 4 recent sold listings" are both good. Never call an asking price a sale.`;
+- rangeUSD: NOT the raw spread of what you found. The cheapest listing is usually an outlier and so is the dearest — one is a bargain or a mistake, the other is someone hoping. Trim both ends and give the band where a piece like this would realistically change hands: above the lowest asking price, below the highest, and drawn from the bulk of what you saw in the middle. Widen it a little when the results were thin, because a thin sample deserves an honest band — but a range so wide it spans every possibility tells the seller nothing. For an original, keep the band generous — a tier spans real spread and pretending otherwise is false precision — but never so wide it spans two tiers. If confidence is "low", repeat the existing estimate unchanged.
+- note: ONE short factual line telling the seller where the number came from, under 60 characters. Name the SOURCE, not a price range — you have often placed the piece deliberately above or below what you found, and a note quoting different numbers than the price beside it just reads as a contradiction. "Based on similar originals listed on Etsy and eBay" and "Based on 4 recent sold listings" are both good; "Based on originals listed at $75-195" is not, when the price shown is $55-120. Say "listed" for active listings and "sold" ONLY for completed sales — never call an asking price a sale.`;
 
 function buildSystemPrompt(basis: AnalyzeResult["valuationBasis"]): string {
   return `You are checking a price estimate against current market information. You get exactly one web search.
@@ -118,6 +145,7 @@ function describeItem(r: AnalyzeResult): string {
     `Category: ${r.category.replace(/_/g, " ")}`,
     `Condition: ${r.condition.replace(/_/g, " ")}`,
     `Kind: ${r.valuationBasis === "original" ? "original one-of-a-kind piece, sold by its maker" : "mass-produced item being resold secondhand"}`,
+    r.craftLevel !== "not_applicable" ? `Craft level (judged from the photo): ${r.craftLevel}` : null,
     `Current estimate: $${r.estimatedValueUSD.low}-${r.estimatedValueUSD.high}`,
   ];
   return lines.filter(Boolean).join("\n");
@@ -143,7 +171,12 @@ export async function verifyPrice(
           name: "web_search",
           // The hard per-scan cost ceiling. One search, $0.01, no exceptions.
           max_uses: 1,
-          allowed_domains: isOriginal ? ORIGINAL_DOMAINS : RESALE_DOMAINS,
+          // Originals block the print farms; resale allows only real resale
+          // marketplaces. The API rejects both fields on one tool, so each mode
+          // sets exactly one of them.
+          ...(isOriginal
+            ? { blocked_domains: ORIGINAL_BLOCKED_DOMAINS }
+            : { allowed_domains: RESALE_DOMAINS }),
           // Prices throughout the app are USD.
           user_location: { type: "approximate", country: "US" },
         } satisfies Anthropic.Messages.WebSearchTool20250305,

@@ -138,12 +138,23 @@ function shouldVerify(r: AnalyzeResult): boolean {
   return r.valuationBasis === "original";
 }
 
+// Bump when the verification prompt changes in a way that should change its
+// answers. Cached entries live 14 days, so without this a prompt fix reaches
+// new items and silently leaves old ones serving the previous wording — which
+// is exactly what happened once: production kept returning a note the prompt no
+// longer produced, and it looked like the deploy had failed.
+const VERIFY_PROMPT_VERSION = "v2";
+
 // Cache identity: what makes two scans "the same item" for pricing purposes.
 // Deliberately excludes the photo — two people photographing the same jacket
-// should share one lookup.
+// should share one lookup. craftLevel is in here because it moves the piece
+// between market tiers, so two paintings with the same title and different
+// grades are genuinely different valuations.
 function verifyCacheKey(r: AnalyzeResult): string {
   const identity = [
+    VERIFY_PROMPT_VERSION,
     r.valuationBasis,
+    r.craftLevel,
     r.brand.toLowerCase(),
     r.title.toLowerCase(),
     r.condition,

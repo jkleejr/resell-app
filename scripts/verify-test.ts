@@ -32,6 +32,9 @@ function fakeResult(
     specificity: basis === "original" ? "generic" : "exact",
     valuationBasis: basis,
     priceConfidence: "low",
+    // Solid amateur work — the tier most things people make at home land in,
+    // and the one worth testing since it's where a wrong tier costs the most.
+    craftLevel: basis === "original" ? "competent" : "not_applicable",
     estimatedValueUSD: { low, high },
     listingDescription: "",
     recommendedPlatform: "eBay",
