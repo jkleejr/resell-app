@@ -59,6 +59,13 @@ async function main(): Promise<void> {
     ["searchQuery is string", typeof result.searchQuery === "string"],
     ["price low <= high", result.estimatedValueUSD.low <= result.estimatedValueUSD.high],
     ["specificity present", ["exact", "generic"].includes(result.specificity)],
+    ["valuationBasis present", ["resale", "original"].includes(result.valuationBasis)],
+    ["priceConfidence present", ["high", "low"].includes(result.priceConfidence)],
+    // An abstract shape is not an original artwork being sold by its maker, and
+    // guessing so would relabel ordinary items and trigger paid lookups.
+    ["abstract image is not 'original'", result.valuationBasis === "resale"],
+    // analyzeImage never verifies; only the handler can upgrade this.
+    ["priceBasis defaults to estimate", result.priceBasis === "estimate"],
   ];
   console.error("");
   let ok = true;

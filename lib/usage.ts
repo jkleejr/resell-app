@@ -1,4 +1,5 @@
-// Per-device daily cap + global scan counters, backed by Upstash Redis (REST).
+// Per-device daily cap, global scan counters, and the price-verification
+// budget/cache — all backed by Upstash Redis (REST).
 //
 // The backend is public, so anyone with the app URL can call /api/analyze and
 // spend our Anthropic credits. This module limits that:
@@ -102,6 +103,84 @@ export async function checkAndRecordScan(
   // so the counter reflects real (paid) scans, not blocked attempts.
   await pipeline([["INCR", "scans:total"]]);
   return { allowed: true };
+}
+
+// --- Price verification: budget + cache ----------------------------------
+//
+// The optional web-search pass (lib/verify.ts) costs about a cent each time it
+// runs. These two helpers are what bound that: a hard daily ceiling on the
+// number of searches, and a cache so the same item is never looked up twice in
+// a fortnight.
+
+const SEARCH_DAILY_CAP = Number(process.env.SEARCH_DAILY_CAP ?? 50);
+
+// Resale prices move slowly; a fortnight-old comp is still a good comp, and
+// re-running the search would cost a cent to learn almost nothing.
+const VERIFY_CACHE_TTL_SECONDS = 1_209_600; // 14 days
+
+/**
+ * Claim one search against today's global budget.
+ *
+ * Note this FAILS CLOSED, the opposite of checkAndRecordScan above. That gate
+ * fails open because a KV blip must never stop someone scanning — the scan is
+ * the product. This one guards spending: if we can't confirm there's budget
+ * left, we skip the search and serve the model's own estimate. The user still
+ * gets a complete result, just an unverified one, so the cost of being wrong
+ * here is a slightly less accurate price rather than a broken app.
+ */
+export async function claimSearchBudget(): Promise<boolean> {
+  if (!configured()) return false;
+
+  const day = utcDay();
+  const key = `search:day:${day}`;
+  const out = await pipeline([
+    ["INCR", key],
+    ["EXPIRE", key, KEY_TTL_SECONDS],
+  ]);
+  if (!out) return false;
+
+  const used = resultInt(out[0]);
+  if (used > SEARCH_DAILY_CAP) {
+    console.log(`[verify] daily search budget spent (${SEARCH_DAILY_CAP})`);
+    return false;
+  }
+  return true;
+}
+
+/** Cached verification for an item identity, or null on miss/misconfig/error. */
+export async function getCachedVerification(
+  key: string,
+): Promise<{ low: number; high: number; note: string } | null> {
+  if (!configured()) return null;
+
+  const out = await pipeline([["GET", `verify:${key}`]]);
+  if (!out) return null;
+  const raw = (out[0] as { result?: unknown })?.result;
+  if (typeof raw !== "string") return null;
+
+  try {
+    const v = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof v.low !== "number" || typeof v.high !== "number") return null;
+    return {
+      low: v.low,
+      high: v.high,
+      note: typeof v.note === "string" ? v.note : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Store a verification. Best-effort — a failed write just means a future miss. */
+export async function cacheVerification(
+  key: string,
+  value: { low: number; high: number; note: string },
+): Promise<void> {
+  if (!configured()) return;
+  await pipeline([
+    ["SET", `verify:${key}`, JSON.stringify(value)],
+    ["EXPIRE", `verify:${key}`, VERIFY_CACHE_TTL_SECONDS],
+  ]);
 }
 
 // All-time total scans across everyone, for the stats counter. Null if unknown

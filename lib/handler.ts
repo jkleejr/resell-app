@@ -1,7 +1,15 @@
+import { createHash } from "node:crypto";
 import { analyzeImage, type ImageInput } from "./analyze.js";
 import { priceItem } from "./price.js";
-import { isValidMediaType } from "./schema.js";
-import { checkAndRecordScan, getTotalScans } from "./usage.js";
+import { isValidMediaType, type AnalyzeResult } from "./schema.js";
+import {
+  cacheVerification,
+  checkAndRecordScan,
+  claimSearchBudget,
+  getCachedVerification,
+  getTotalScans,
+} from "./usage.js";
+import { verifyPrice } from "./verify.js";
 
 export interface HandlerResponse {
   status: number;
@@ -82,11 +90,92 @@ export async function handleAnalyzeRequest(
 
   try {
     const result = await analyzeImage(images, hint);
-    return { status: 200, body: result as unknown as Record<string, unknown> };
+    const priced = await maybeVerifyPrice(result);
+    return { status: 200, body: priced as unknown as Record<string, unknown> };
   } catch (err) {
     console.error("[analyze] failed:", err);
     return { status: 502, body: { error: "Analysis failed" } };
   }
+}
+
+// --- Optional price verification -----------------------------------------
+//
+// Off unless PRICE_VERIFY=on. Everything below is additive: on any miss, skip,
+// budget exhaustion, or failure the caller gets exactly the result it would
+// have got before this existed.
+
+// Below this the search isn't worth its own cost — a cent and several seconds
+// to refine a $30 estimate helps nobody.
+const VERIFY_MIN_USD = Number(process.env.VERIFY_MIN_USD ?? 40);
+
+/**
+ * Decide whether one web search is worth a cent for this item.
+ *
+ * The deciding signals come from the MODEL, in the call we already made:
+ * `valuationBasis` and `priceConfidence` are both declared before the price, so
+ * by the time we get here the model has already told us whether it was working
+ * from a market it knows.
+ *
+ * The important thing is which way this points. The obvious gate — verify the
+ * items we identified precisely — is backwards: a confidently identified Levi's
+ * 501 is exactly the item whose price the model already knows cold, and paying
+ * to look it up buys almost nothing. Search earns its cent where pretrained
+ * knowledge is THIN: one-of-a-kind pieces with no market to memorise, and
+ * anything the model itself flags as a guess.
+ */
+function shouldVerify(r: AnalyzeResult): boolean {
+  if (process.env.PRICE_VERIFY !== "on") return false;
+  if (r.estimatedValueUSD.high < VERIFY_MIN_USD) return false;
+  return r.valuationBasis === "original" || r.priceConfidence === "low";
+}
+
+// Cache identity: what makes two scans "the same item" for pricing purposes.
+// Deliberately excludes the photo — two people photographing the same jacket
+// should share one lookup.
+function verifyCacheKey(r: AnalyzeResult): string {
+  const identity = [
+    r.valuationBasis,
+    r.brand.toLowerCase(),
+    r.title.toLowerCase(),
+    r.condition,
+  ].join("|");
+  return createHash("sha1").update(identity).digest("hex").slice(0, 20);
+}
+
+async function maybeVerifyPrice(result: AnalyzeResult): Promise<AnalyzeResult> {
+  if (!shouldVerify(result)) return result;
+
+  const key = verifyCacheKey(result);
+
+  // Cache first: a hit costs nothing and makes a repeat scan faster, not just
+  // cheaper. Cached ranges skipped the sanity check on the way out, so they've
+  // already been vetted once.
+  const cached = await getCachedVerification(key);
+  if (cached) {
+    console.log("[verify] cache hit");
+    return applyVerified(result, cached);
+  }
+
+  // Only now do we spend. Fails closed: no budget, no search.
+  if (!(await claimSearchBudget())) return result;
+
+  const verified = await verifyPrice(result);
+  if (!verified) return result;
+
+  await cacheVerification(key, verified);
+  return applyVerified(result, verified);
+}
+
+function applyVerified(
+  result: AnalyzeResult,
+  v: { low: number; high: number; note: string },
+): AnalyzeResult {
+  return {
+    ...result,
+    estimatedValueUSD: { low: v.low, high: v.high },
+    priceBasis: "verified",
+    priceNote: v.note,
+  };
 }
 
 // Loot Check 1.0.0 is live in the App Store and fetches the price over the wire;

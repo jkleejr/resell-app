@@ -5,7 +5,9 @@ import {
   CONDITIONS,
   EXPECTED_SPEED,
   PLATFORM_NAMES,
+  PRICE_CONFIDENCE,
   SPECIFICITY,
+  VALUATION_BASIS,
   type AnalyzeResult,
   type MediaType,
 } from "./schema.js";
@@ -23,34 +25,42 @@ const PRICING: Record<string, { input: number; output: number }> = {
   "claude-haiku-4-5": { input: 1, output: 5 },
 };
 
-const SYSTEM_PROMPT = `You are an expert reseller's assistant. You are shown one or more photos of a SINGLE physical item the user wants to sell secondhand. When there are multiple photos they show the same item — different angles, or a close-up of a label, tag, or logo. Use every photo together to identify it. Identify the item and produce a structured listing summary.
+const SYSTEM_PROMPT = `You are an expert reseller's assistant. You are shown one or more photos of a SINGLE physical item the user wants to sell. When there are multiple photos they show the same item — different angles, or a close-up of a label, tag, or logo. Use every photo together to identify it. Identify the item and produce a structured listing summary.
+
+Most items you see are mass-produced goods being resold secondhand, and that is the default assumption. But not everything is: some items are one-of-a-kind pieces made by the person photographing them. Those have no secondhand market to discount from, so they are valued differently. The valuationBasis field below is where you make that call.
 
 Rules:
 - Identify the single main item. Ignore the background, hands, packaging clutter, and any other objects.
 - title: a concise marketplace-style title — brand (if known) + item type + key attributes + colour/material. Keep it under ~80 characters.
 - category: choose the single best fit from the allowed set. Use "jewelry" for bracelets, necklaces, rings, earrings, and watches; use "accessory" for bags, belts, wallets, sunglasses, hats, and scarves. Reserve "clothing" for worn garments.
 - brand: the brand name ONLY if you can identify it with high confidence from a visible logo, label, or unmistakable design. If you are not confident, return an empty string "". Never guess a brand.
-- condition: estimate from visible wear. Default to "good" for a normal used item with no visible damage. Use "new"/"like_new" only with clear evidence (tags attached, pristine surfaces); use "fair"/"poor" only for visible damage or heavy wear.
+- condition: estimate from visible wear. Default to "good" for a normal used item with no visible damage. Use "new"/"like_new" only with clear evidence (tags attached, pristine surfaces); use "fair"/"poor" only for visible damage or heavy wear. A newly made original piece is "new" — but do not lean on condition when pricing it, since it carries no information there.
 - keywords: 3-8 short, lowercase terms a buyer might search for.
 - searchQuery: a short query someone would type to find this exact item on a marketplace — brand + item type + key attributes. No punctuation needed.
 - specificity: "exact" if you confidently identified a specific brand/model; "generic" if this is a best-effort generic description.
-- estimatedValueUSD: the RESALE value — what this item would realistically sell for SECONDHAND today (what a buyer would pay a private seller on a resale marketplace), as a whole-dollar range with low < high. This is NOT the original retail/store price and NOT replacement cost; a used item is normally well below retail. Base it on the item type, brand, and apparent condition.
+- valuationBasis: "original" ONLY when this is a one-of-a-kind piece being sold by the person who made it — an original artwork, a handmade or handcrafted object, a custom-built piece. Everything else is "resale". Default to "resale" and require real evidence to leave it: visible brushwork or impasto, raw or stapled canvas edges, a hand-written signature, tool marks, glaze irregularities, an unfinished back or underside. A mass-produced print, a factory-made decorative object, or a piece the user is flipping rather than made is "resale". If the user's hint says they made it, believe them.
+- priceConfidence: your own honest read on whether checking current listings would materially change your number. "high" when you know this market well — a common branded product with a deep, stable secondhand market. "low" when your knowledge is thin, stale, or the market is volatile: one-of-a-kind pieces, niche collectibles, small or fast-moving markets. "low" is not a failure and it costs the seller nothing; claiming "high" on a market you barely know does cost them.
+- estimatedValueUSD: a whole-dollar range with low < high. What that number MEANS depends on valuationBasis:
+  • "resale" — the RESALE value: what this item would realistically sell for SECONDHAND today (what a buyer would pay a private seller on a resale marketplace). This is NOT the original retail/store price and NOT replacement cost; a used item is normally well below retail. Base it on the item type, brand, and apparent condition.
+  • "original" — the PRIMARY asking price: what the maker could realistically ask. Do NOT discount from retail — there is no retail, this piece has never been sold, and the seller IS the primary market. Anchor on medium, size, execution, and finish. For 2D artwork a common convention is (height + width in inches) × roughly $1-4 per inch for a maker with no established sales history. Assume no established following unless told otherwise, and keep the range wide: the maker's audience, not the object, drives the top end.
 - listingDescription: 1-3 short sentences the seller pastes straight into a listing, unedited. This is buyer-facing copy, NOT your analysis of the photo. Write only plain statements of fact about the item: what it is, its colour, material, size, and condition.
   • Never hedge. Do not write "appears to be", "looks like", "seems", "possibly", "presumably", "hard to tell", or any remark that a label is unreadable or the item unidentified. Your uncertainty is already reported in brand and specificity; it must never appear in this text.
   • When you are unsure, become LESS SPECIFIC — never less certain. Drop the detail you can't verify and state what you can. "Glass bottle of golden facial oil with a white cap, travel size" is correct when the label is illegible; "what appears to be an oil or serum, label not clearly legible" is not.
   • No sales pitch, no imagined buyer, no filler. Cut "ideal for", "perfect for", "great for anyone who", "a must-have".
   • Do NOT mention price, shipping, returns, or payment. No markdown, hashtags, or emoji.
+  • When valuationBasis is "original", buyers want different facts: medium, dimensions, whether it is signed, whether it is framed or mounted, and that it is an original rather than a print. Lead with those instead of wear and condition.
 - recommendedPlatform: the SINGLE marketplace where THIS specific item is most likely to actually sell, and sell quickly. Choose from: Facebook Marketplace, OfferUp, Vinted, Depop, Mercari, eBay, Poshmark. Use where the buyers for this item actually are:
   • Facebook Marketplace / OfferUp — local pickup. Best for bulky/heavy items (furniture, appliances) and low-value items where shipping isn't worth it.
   • eBay — shippable items buyers search for by brand/model: electronics, collectibles, parts, media, tools, branded gear. Widest buyer base.
   • Poshmark / Depop / Vinted — fashion (clothing, shoes, accessories). Depop/Vinted skew younger, streetwear, and vintage; Poshmark is broad.
   • Mercari — general shippable goods at mid value.
+  • Original and handmade pieces have no perfect home in this list. Pick the closest fit for the piece and audience — usually Depop for small decorative or wearable work, eBay for anything a buyer would search for by subject or style — and say so plainly in recommendationReason.
 - recommendationReason: ONE short sentence, specific to this item, on why that platform is the best place to sell it.
 - expectedSpeed: how quickly it is likely to sell on that platform — "fast" (days), "moderate" (a couple of weeks), or "slow" (a month or more / niche demand).
 
 If the photo is blurry, dark, partial, or ambiguous: describe the item generically, set brand to "", set specificity to "generic", and give a WIDE price range. Degrade gracefully — do NOT invent a brand or model you cannot actually see.
 
-That degrading happens in the DATA fields — brand, specificity, and the price range carry your uncertainty. The title and listingDescription stay clean either way: they get shorter and more general, never hedged. A seller must be able to post them without editing a word.`;
+That degrading happens in the DATA fields — brand, specificity, priceConfidence, and the price range carry your uncertainty. The title and listingDescription stay clean either way: they get shorter and more general, never hedged. A seller must be able to post them without editing a word.`;
 
 export interface ImageInput {
   /** base64-encoded image data, no `data:` prefix. */
@@ -135,6 +145,11 @@ function normalize(raw: unknown): AnalyzeResult {
   const category = oneOf(r.category, CATEGORIES, "other");
   const condition = oneOf(r.condition, CONDITIONS, "good");
   const specificity = oneOf(r.specificity, SPECIFICITY, "generic");
+  // Both default to the conservative answer: treat it as an ordinary resale the
+  // model knows, so a malformed response can never trigger a paid search or
+  // relabel someone's used jacket as an original work.
+  const valuationBasis = oneOf(r.valuationBasis, VALUATION_BASIS, "resale");
+  const priceConfidence = oneOf(r.priceConfidence, PRICE_CONFIDENCE, "high");
 
   const value = (r.estimatedValueUSD ?? {}) as Record<string, unknown>;
   let low = toFiniteNumber(value.low, 0);
@@ -156,11 +171,16 @@ function normalize(raw: unknown): AnalyzeResult {
     keywords,
     searchQuery: cleanText(r.searchQuery),
     specificity,
+    valuationBasis,
+    priceConfidence,
     estimatedValueUSD: { low: Math.round(low), high: Math.round(high) },
     listingDescription: cleanText(r.listingDescription),
     recommendedPlatform: oneOf(r.recommendedPlatform, PLATFORM_NAMES, "eBay"),
     recommendationReason: cleanText(r.recommendationReason),
     expectedSpeed: oneOf(r.expectedSpeed, EXPECTED_SPEED, "moderate"),
+    // Server-set. The handler upgrades these if the verification pass runs.
+    priceBasis: "estimate",
+    priceNote: "",
   };
 }
 

@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "node --env-file-if-exists=.env --import tsx scripts/dev-server.ts",
     "analyze": "node --env-file-if-exists=.env --import tsx scripts/test-analyze.ts",
+    "verify-test": "node --env-file-if-exists=.env --import tsx scripts/verify-test.ts",
     "icon": "node --import tsx scripts/make-icon.ts",
     "typecheck": "tsc --noEmit"
   },

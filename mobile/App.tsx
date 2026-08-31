@@ -32,6 +32,11 @@ type AnalyzeResult = {
   recommendedPlatform: string;
   recommendationReason: string;
   expectedSpeed: "fast" | "moderate" | "slow";
+  // Added after 1.0.2 shipped. Optional so a build running against an older
+  // backend deploy just falls back to the resale wording.
+  valuationBasis?: "resale" | "original";
+  priceBasis?: "estimate" | "verified";
+  priceNote?: string;
 };
 
 type CapturedImage = { uri: string; base64: string };
@@ -197,7 +202,13 @@ export default function App() {
   }
 
   // The price is the model's estimate from the analyze call — no second request.
+  // The backend may have refined it with a web search before responding; that
+  // shows up as priceBasis "verified", not as extra work here.
   const price = result ? toPrice(result.estimatedValueUSD) : null;
+
+  // One-of-a-kind pieces are priced as a first sale, so the whole card reads
+  // differently — see the price block below.
+  const isOriginal = result?.valuationBasis === "original";
 
   const comparison =
     price && result
@@ -336,15 +347,25 @@ export default function App() {
               </View>
             )}
 
-            {/* Price */}
+            {/* Price. An original piece has never been sold, so "resale" is
+                the wrong frame for it — the number is what the maker could
+                ask, not what a used one fetches. */}
             <View style={styles.card}>
-              <Text style={styles.sectionLabel}>Estimated resale value</Text>
+              <Text style={styles.sectionLabel}>
+                {isOriginal ? "Estimated value" : "Estimated resale value"}
+              </Text>
               {price && (
                 <>
                   <Text style={styles.price}>${price.median}</Text>
                   <Text style={styles.priceRange}>
-                    resells for ${price.low}–${price.high}
+                    {isOriginal ? "could ask" : "resells for"} ${price.low}–$
+                    {price.high}
                   </Text>
+                  {result.priceBasis === "verified" && (
+                    <Text style={styles.priceNote}>
+                      ✓ {result.priceNote || "Checked against current listings"}
+                    </Text>
+                  )}
                 </>
               )}
             </View>
@@ -656,6 +677,8 @@ const styles = StyleSheet.create({
   },
   price: { color: "#fff", fontSize: 38, fontWeight: "800" },
   priceRange: { color: "#A8A8B0", fontSize: 15 },
+  // Same green as the "best platform" lead — this line means "we checked".
+  priceNote: { color: "#4ADE80", fontSize: 13, marginTop: 8 },
   recLead: { color: "#4ADE80", fontSize: 17, fontWeight: "700" },
   reason: { color: "#C8C8D0", fontSize: 14, lineHeight: 20 },
   speed: { color: "#A8A8B0", fontSize: 13, marginBottom: 6 },

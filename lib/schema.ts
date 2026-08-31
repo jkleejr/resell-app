@@ -23,6 +23,24 @@ export const CONDITIONS = ["new", "like_new", "good", "fair", "poor"] as const;
 
 export const SPECIFICITY = ["exact", "generic"] as const;
 
+// What KIND of value we're estimating. The app was built around "resale", but
+// not everything photographed has a secondhand market to look up: an original
+// painting, a handmade piece, anything one-of-a-kind is sold by its maker for
+// the FIRST time, so pricing it below retail is answering the wrong question
+// (there is no retail — the seller is the primary market).
+export const VALUATION_BASIS = ["resale", "original"] as const;
+
+// The model's own read on whether looking the item up would materially change
+// its number. This is what gates the optional web-search pass in lib/verify.ts:
+// searching is worth a cent where the model's pretrained knowledge is THIN, not
+// where identification is sharp. A Levi's 501 is "high" (deep, stable market it
+// already knows); a hand-thrown mug or a niche collectible is "low".
+export const PRICE_CONFIDENCE = ["high", "low"] as const;
+
+// Where the price we return actually came from. Set by the SERVER, never by the
+// model: "verified" only after lib/verify.ts successfully refined the range.
+export const PRICE_BASIS = ["estimate", "verified"] as const;
+
 // Marketplaces the model may recommend. MUST match the platform names in
 // mobile/pricing.ts exactly — the client highlights the row by name.
 export const PLATFORM_NAMES = [
@@ -43,6 +61,9 @@ export type Condition = (typeof CONDITIONS)[number];
 export type Specificity = (typeof SPECIFICITY)[number];
 export type PlatformName = (typeof PLATFORM_NAMES)[number];
 export type ExpectedSpeed = (typeof EXPECTED_SPEED)[number];
+export type ValuationBasis = (typeof VALUATION_BASIS)[number];
+export type PriceConfidence = (typeof PRICE_CONFIDENCE)[number];
+export type PriceBasis = (typeof PRICE_BASIS)[number];
 
 export interface AnalyzeResult {
   title: string;
@@ -55,6 +76,10 @@ export interface AnalyzeResult {
   /** Declared BEFORE the price so the model commits to how well it knows the
    *  item before it commits to a number. */
   specificity: Specificity;
+  /** Also before the price: "resale" discounts from retail, "original" does not. */
+  valuationBasis: ValuationBasis;
+  /** Also before the price: the model's own read on whether it's guessing. */
+  priceConfidence: PriceConfidence;
   estimatedValueUSD: { low: number; high: number };
   /** Ready-to-post marketplace description, generated in the same vision call. */
   listingDescription: string;
@@ -64,7 +89,52 @@ export interface AnalyzeResult {
   recommendationReason: string;
   /** Rough how-fast-it-sells signal on the recommended platform. */
   expectedSpeed: ExpectedSpeed;
+
+  // --- Server-set, NOT model-set. Deliberately absent from ANALYZE_SCHEMA
+  // (which is additionalProperties:false) and filled in by the handler after
+  // the optional verification pass. Older app builds ignore unknown keys, so
+  // adding them here is safe for 1.0.0-1.0.2 installs already in the wild.
+  /** "verified" only when a web-search pass actually refined the range. */
+  priceBasis: PriceBasis;
+  /** One short line on what the verification found. "" when not verified. */
+  priceNote: string;
 }
+
+// --- /api/analyze verification pass (lib/verify.ts) -----------------------
+
+// The second, optional, TEXT-ONLY call. It never re-sends the photo — the item
+// is already identified, so the input is ~40 tokens of text instead of ~1,050
+// tokens of image processed a second time. That's most of what keeps this cheap.
+export interface VerifiedPrice {
+  low: number;
+  high: number;
+  /** Short, user-facing provenance line, e.g. "3 recent sold listings, $32-41". */
+  note: string;
+}
+
+export const VERIFY_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    // Reasoning first: what the search actually turned up, in prose, before any
+    // number is generated. Same ordering principle as specificity above.
+    findings: { type: "string" },
+    // "low" tells us to DISCARD the result and keep the model's own estimate —
+    // a bad comp is worse than an honest guess.
+    confidence: { type: "string", enum: [...PRICE_CONFIDENCE] },
+    rangeUSD: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        low: { type: "number" },
+        high: { type: "number" },
+      },
+      required: ["low", "high"],
+    },
+    note: { type: "string" },
+  },
+  required: ["findings", "confidence", "rangeUSD", "note"],
+} as const;
 
 // JSON Schema passed to the model. Structured outputs require
 // additionalProperties:false and all keys listed in `required`.
@@ -83,6 +153,8 @@ export const ANALYZE_SCHEMA = {
     keywords: { type: "array", items: { type: "string" } },
     searchQuery: { type: "string" },
     specificity: { type: "string", enum: [...SPECIFICITY] },
+    valuationBasis: { type: "string", enum: [...VALUATION_BASIS] },
+    priceConfidence: { type: "string", enum: [...PRICE_CONFIDENCE] },
     estimatedValueUSD: {
       type: "object",
       additionalProperties: false,
@@ -105,6 +177,8 @@ export const ANALYZE_SCHEMA = {
     "keywords",
     "searchQuery",
     "specificity",
+    "valuationBasis",
+    "priceConfidence",
     "estimatedValueUSD",
     "listingDescription",
     "recommendedPlatform",
