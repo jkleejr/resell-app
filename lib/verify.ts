@@ -118,19 +118,17 @@ Your job is then to place THIS piece in the right tier. You are told its craft l
 
 Placing a competent piece in the professional tier is the failure mode to avoid: it produces a price nobody pays and the piece never sells. When the craft level sits between two tiers, take the lower one.
 
-Assume the maker has no established following unless told otherwise. Their audience, not the object, drives the top of the range.`;
+Assume the maker has no established following unless told otherwise. Their audience, not the object, drives the top of the range.
+
+You are giving the seller an IDEA of what their piece could fetch, not an appraisal. A few comparable pieces with visible prices, from whichever single marketplace happens to have them, is enough to answer that. Do not try to be comprehensive, do not survey several sites, and do not privilege any particular one — take the credible prices the search puts in front of you and work from those. Holding out for a thorough picture just means returning nothing, and nothing is worse than a rough number honestly labelled.`;
 
 // How to turn what the search found into a number. Shared, because the
 // discipline is the same either way: interpret the spread, don't report it.
 const REPORTING_RULES = `Then report, in this order:
 - findings: what the search actually showed — the prices you saw and where. One or two sentences. If the results were thin, off-target, or about a different item, say so plainly.
-- confidence: "high" only if the results genuinely support a price band for this item. "low" if they were thin, irrelevant, or about a different product. When in doubt choose "low": the existing estimate is kept and nothing is lost. An unhelpful search is a normal outcome and reporting it honestly is correct.
+- confidence: "high" when the results give you a workable idea of the price; "low" when they were off-target, about a different item, or carried no prices at all. Calibrate this to the job: for a one-of-a-kind piece the seller wants a ballpark, so a few comparable listings with visible prices is enough and demanding a thorough survey just returns nothing. For a resale item the bar is higher, because a real going rate exists and asking prices are not it. When genuinely in doubt choose "low" — the existing estimate is kept and nothing is lost.
 - rangeUSD: NOT the raw spread of what you found. The cheapest listing is usually an outlier and so is the dearest — one is a bargain or a mistake, the other is someone hoping. Trim both ends and give the band where a piece like this would realistically change hands: above the lowest asking price, below the highest, and drawn from the bulk of what you saw in the middle. Widen it a little when the results were thin, because a thin sample deserves an honest band — but a range so wide it spans every possibility tells the seller nothing. For an original, keep the band generous — a tier spans real spread and pretending otherwise is false precision — but never so wide it spans two tiers. If confidence is "low", repeat the existing estimate unchanged.
-- note: ONE short line under the price telling the seller where it came from. Keep it under 40 characters and cut every word not doing work.
-    Good: "Based on prior listings" / "Based on prior Etsy listings" / "Based on recent sold listings"
-    Bad: "Based on 4 recent sold listings" — the count is noise. The seller cannot check it and it changes nothing they would do.
-    Bad: "Based on similar originals listed on Etsy and comparable marketplaces" — half of that is padding.
-    Bad: "Based on originals listed at $75-195" — never quote a range. You often place the piece deliberately above or below what you found, and numbers that disagree with the price beside them read as a contradiction.
+- note: ONE short line under the price saying WHERE it came from. Under 40 characters. Never describe the item — the seller is looking at it, so "Based on Etsy listings for handmade stoneware mugs" wastes its second half saying what they already know. "Based on Etsy listings" is the whole note. Default to "Based on prior listings" and name a marketplace only when one clearly supplied the prices, without reaching for the same one from habit.
   Name at most one marketplace, or none. Say "listed" for active listings and "sold" ONLY for completed sales — never call an asking price a sale.`;
 
 function buildSystemPrompt(basis: AnalyzeResult["valuationBasis"]): string {
@@ -280,7 +278,18 @@ function interpret(
         .replace(/\s+/g, " ").trim().slice(0, 80)
     : "";
 
-  return { low, high, note: note || "Checked against current listings" };
+  // Length backstop. The prompt asks for under 40 characters and mostly gets
+  // it, but it drifts — "Based on Etsy listings" one run, "Based on active
+  // listings across retail sites" the next. Truncating would leave a mangled
+  // half-sentence under the price, so anything over budget falls back to the
+  // generic line instead. Nothing is lost: the overflow is always padding, and
+  // the note only ever claimed to say where the number came from.
+  const GENERIC = "Based on prior listings";
+  return {
+    low,
+    high,
+    note: note.length > 0 && note.length <= 40 ? note : GENERIC,
+  };
 }
 
 function toFinite(value: unknown): number {
