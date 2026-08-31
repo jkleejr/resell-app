@@ -67,6 +67,12 @@ export default function App() {
     null,
   );
   const [totalScans, setTotalScans] = useState<number | null>(null);
+  // Set when the backend returns 429. Blocks further scanning until the cap
+  // resets at UTC midnight. Deliberately NOT persisted: on a fresh launch the
+  // next scan asks the server again, which either succeeds because the day
+  // rolled over or returns 429 and sets this straight back. That keeps the
+  // reset honest without the app having to track a clock the server owns.
+  const [limitReached, setLimitReached] = useState(false);
 
   // Global all-time scan counter (just for fun). Best-effort; ignore failures.
   async function fetchStats() {
@@ -166,6 +172,10 @@ export default function App() {
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
+        // 429 is the daily scan cap. Remember it, so the UI stops offering a
+        // retry that cannot succeed — every further attempt would just be a
+        // round trip to the same refusal.
+        if (res.status === 429) setLimitReached(true);
         throw new Error(body.error ?? `Server returned ${res.status}`);
       }
 
@@ -229,6 +239,16 @@ export default function App() {
           <Text style={styles.counter}>
             🛍️ {totalScans.toLocaleString()} items scanned globally
           </Text>
+        )}
+
+        {/* Stays up across "Start over", which clears the error text — without
+            it the Identify button would sit disabled with nothing saying why. */}
+        {limitReached && (
+          <View style={styles.limitBox}>
+            <Text style={styles.limitText}>
+              You've reached today's scan limit. Try again tomorrow.
+            </Text>
+          </View>
         )}
 
         {/* Compose: thumbnails + hint (idle only) */}
@@ -482,11 +502,14 @@ export default function App() {
               <>
                 <PrimaryButton
                   label={
-                    images.length > 1
-                      ? `Identify · ${images.length} photos`
-                      : "Identify"
+                    limitReached
+                      ? "Daily limit reached"
+                      : images.length > 1
+                        ? `Identify · ${images.length} photos`
+                        : "Identify"
                   }
                   onPress={identify}
+                  disabled={limitReached}
                 />
                 {images.length < MAX_IMAGES && (
                   <>
@@ -506,7 +529,9 @@ export default function App() {
 
           {status === "error" && (
             <>
-              {images.length > 0 && (
+              {/* No retry once the cap is hit — it cannot succeed until the
+                  limit resets, and offering the button implies otherwise. */}
+              {images.length > 0 && !limitReached && (
                 <PrimaryButton label="Try again" onPress={identify} />
               )}
               <SecondaryButton label="Start over" onPress={reset} />
@@ -729,6 +754,9 @@ const styles = StyleSheet.create({
   copyBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   errorBox: { backgroundColor: "#2A1416", borderRadius: 14, padding: 16 },
   errorText: { color: "#FFB4B4", fontSize: 15, lineHeight: 21 },
+  // Amber, not red: hitting the cap is a limit, not a failure.
+  limitBox: { backgroundColor: "#2A2416", borderRadius: 14, padding: 16 },
+  limitText: { color: "#F5D68A", fontSize: 15, lineHeight: 21 },
   actions: { gap: 12, marginTop: 8 },
   primaryBtn: {
     backgroundColor: "#fff",
