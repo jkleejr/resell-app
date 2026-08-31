@@ -125,7 +125,7 @@ v1 ships rung 1 only. Do NOT integrate image search before M1 returns JSON.
 [Expo app]
    |  photo (downscaled, base64)
    v
-[Vercel: POST /api/analyze]  --> vision model --> {title, category, condition, keywords, searchQuery, estimatedValueUSD, specificity}
+[Vercel: POST /api/analyze]  --> vision model --> {title, category, condition, keywords, searchQuery, specificity, estimatedValueUSD}
    |
    |  (M5) if specificity == "generic": POST /api/identify --> Lens image search --> candidate names + cross-platform asking prices --> model confirms
    |
@@ -168,8 +168,8 @@ Response:
   "condition": "good",
   "keywords": ["mid century", "dining chair", "walnut", "west elm"],
   "searchQuery": "West Elm mid century dining chair walnut",
-  "estimatedValueUSD": { "low": 60, "high": 120 },
-  "specificity": "exact"
+  "specificity": "exact",
+  "estimatedValueUSD": { "low": 60, "high": 120 }
 }
 ```
 `category` ∈ `furniture, electronics, clothing, shoes, collectible, kitchenware, home_decor, tool, sporting_goods, toy, book_media, other`.

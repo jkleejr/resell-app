@@ -52,8 +52,10 @@ export interface AnalyzeResult {
   condition: Condition;
   keywords: string[];
   searchQuery: string;
-  estimatedValueUSD: { low: number; high: number };
+  /** Declared BEFORE the price so the model commits to how well it knows the
+   *  item before it commits to a number. */
   specificity: Specificity;
+  estimatedValueUSD: { low: number; high: number };
   /** Ready-to-post marketplace description, generated in the same vision call. */
   listingDescription: string;
   /** Best marketplace for THIS item to actually sell (model's judgment). */
@@ -66,6 +68,9 @@ export interface AnalyzeResult {
 
 // JSON Schema passed to the model. Structured outputs require
 // additionalProperties:false and all keys listed in `required`.
+// Key ORDER matters: the model generates fields in declaration order, so
+// `specificity` sits above `estimatedValueUSD` — it admits how well it knows
+// the item before every price token is generated.
 // (No min/max or string-length constraints — unsupported by structured outputs.)
 export const ANALYZE_SCHEMA = {
   type: "object",
@@ -77,6 +82,7 @@ export const ANALYZE_SCHEMA = {
     condition: { type: "string", enum: [...CONDITIONS] },
     keywords: { type: "array", items: { type: "string" } },
     searchQuery: { type: "string" },
+    specificity: { type: "string", enum: [...SPECIFICITY] },
     estimatedValueUSD: {
       type: "object",
       additionalProperties: false,
@@ -86,7 +92,6 @@ export const ANALYZE_SCHEMA = {
       },
       required: ["low", "high"],
     },
-    specificity: { type: "string", enum: [...SPECIFICITY] },
     listingDescription: { type: "string" },
     recommendedPlatform: { type: "string", enum: [...PLATFORM_NAMES] },
     recommendationReason: { type: "string" },
@@ -99,8 +104,8 @@ export const ANALYZE_SCHEMA = {
     "condition",
     "keywords",
     "searchQuery",
-    "estimatedValueUSD",
     "specificity",
+    "estimatedValueUSD",
     "listingDescription",
     "recommendedPlatform",
     "recommendationReason",

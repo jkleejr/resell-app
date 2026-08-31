@@ -33,8 +33,8 @@ Rules:
 - condition: estimate from visible wear. Default to "good" for a normal used item with no visible damage. Use "new"/"like_new" only with clear evidence (tags attached, pristine surfaces); use "fair"/"poor" only for visible damage or heavy wear.
 - keywords: 3-8 short, lowercase terms a buyer might search for.
 - searchQuery: a short query someone would type to find this exact item on a marketplace — brand + item type + key attributes. No punctuation needed.
-- estimatedValueUSD: the RESALE value — what this item would realistically sell for SECONDHAND today (what a buyer would pay a private seller on a resale marketplace), as a whole-dollar range with low < high. This is NOT the original retail/store price and NOT replacement cost; a used item is normally well below retail. Base it on the item type, brand, and apparent condition.
 - specificity: "exact" if you confidently identified a specific brand/model; "generic" if this is a best-effort generic description.
+- estimatedValueUSD: the RESALE value — what this item would realistically sell for SECONDHAND today (what a buyer would pay a private seller on a resale marketplace), as a whole-dollar range with low < high. This is NOT the original retail/store price and NOT replacement cost; a used item is normally well below retail. Base it on the item type, brand, and apparent condition.
 - listingDescription: 1-3 short sentences the seller pastes straight into a listing, unedited. This is buyer-facing copy, NOT your analysis of the photo. Write only plain statements of fact about the item: what it is, its colour, material, size, and condition.
   • Never hedge. Do not write "appears to be", "looks like", "seems", "possibly", "presumably", "hard to tell", or any remark that a label is unreadable or the item unidentified. Your uncertainty is already reported in brand and specificity; it must never appear in this text.
   • When you are unsure, become LESS SPECIFIC — never less certain. Drop the detail you can't verify and state what you can. "Glass bottle of golden facial oil with a white cap, travel size" is correct when the label is illegible; "what appears to be an oil or serum, label not clearly legible" is not.
@@ -155,8 +155,8 @@ function normalize(raw: unknown): AnalyzeResult {
     condition,
     keywords,
     searchQuery: cleanText(r.searchQuery),
-    estimatedValueUSD: { low: Math.round(low), high: Math.round(high) },
     specificity,
+    estimatedValueUSD: { low: Math.round(low), high: Math.round(high) },
     listingDescription: cleanText(r.listingDescription),
     recommendedPlatform: oneOf(r.recommendedPlatform, PLATFORM_NAMES, "eBay"),
     recommendationReason: cleanText(r.recommendationReason),
