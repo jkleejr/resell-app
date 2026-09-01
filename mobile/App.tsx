@@ -37,6 +37,8 @@ type AnalyzeResult = {
   valuationBasis?: "resale" | "original";
   priceBasis?: "estimate" | "verified";
   priceNote?: string;
+  /** The model's own read on whether it knows this market well. */
+  priceConfidence?: "high" | "low";
 };
 
 type CapturedImage = { uri: string; base64: string };
@@ -220,6 +222,17 @@ export default function App() {
   // differently — see the price block below.
   const isOriginal = result?.valuationBasis === "original";
 
+  // An ordinary item priced with nothing to hedge: the exact product was
+  // identified, the brand was legible, and the model rates its knowledge of
+  // this market as solid. All three matter. Any two without the third leaves
+  // something real unsaid — a perfectly identified item in a market the model
+  // admits it doesn't follow is exactly the price NOT to put a tick beside.
+  const confidentResale =
+    !isOriginal &&
+    result?.specificity === "exact" &&
+    Boolean(result?.brand) &&
+    result?.priceConfidence === "high";
+
   const comparison =
     price && result
       ? buildComparison(price.median, result.recommendedPlatform)
@@ -381,9 +394,18 @@ export default function App() {
                     {isOriginal ? "could ask" : "resells for"} ${price.low}–$
                     {price.high}
                   </Text>
-                  {/* Green tick only when listings actually backed the number.
-                      A failed lookup still gets its line, in muted grey — it
-                      explains the extra wait without dressing up as evidence. */}
+                  {/* One line under the price saying how much to trust it.
+                      Green tick when something backs the number, muted grey
+                      when a lookup came back empty, nothing at all when the
+                      model is working from a guess — silence is the honest
+                      signal there, and the "generic" nudge above already says
+                      how to improve it.
+
+                      The two ticks mean different things and the wording is
+                      what separates them: "Based on prior listings" points at
+                      outside evidence, "Exact product match" points at the
+                      identification. Never let the resale line imply prices
+                      were looked up — for these they never are. */}
                   {result.priceNote ? (
                     <Text
                       style={
@@ -395,6 +417,8 @@ export default function App() {
                       {result.priceBasis === "verified" ? "✓ " : ""}
                       {result.priceNote}
                     </Text>
+                  ) : confidentResale ? (
+                    <Text style={styles.priceNote}>✓ Exact product match</Text>
                   ) : null}
                 </>
               )}
