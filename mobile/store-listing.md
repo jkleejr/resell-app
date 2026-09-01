@@ -1,7 +1,9 @@
 # App Store listing — Loot Check
 
 Copy each field into the matching App Store Connect field.
-Current submission: **1.0.2** (build auto-increments remotely; last shipped was 1.0.1, released 29 Aug 2026).
+Current submission: **1.0.3** (build auto-increments remotely; 1.0.2 was built 29 Aug 2026 —
+confirm it has finished review before submitting this one, since App Store Connect will
+not accept a new version while another is still in review).
 
 ## App Name (max 30)
 Loot Check
@@ -26,11 +28,19 @@ Paste into App Store Connect → the new version's **What's New in This Version*
 Required for every update; it's the one listing field a new version forces you to fill in.
 
 ```
-• A refreshed app icon
+• Handmade and original items are now priced as one-of-a-kind pieces rather than secondhand goods
+• Some prices now show what they're based on
+• A clearer message when you reach the daily scan limit
 ```
 
 ### Release-note history
 
+- **1.0.3** — original/handmade valuation surfaced in the UI: originals show
+  "Estimated value" rather than a resale price, prices can carry a provenance
+  line, and hitting the daily cap now actually stops further scans instead of
+  offering a retry that cannot succeed. The valuation itself shipped earlier via
+  the backend and is already live for 1.0.x installs; this build is what makes it
+  legible on screen.
 - **1.0.2** — new app icon (second revision of the scan-tag mark).
 - **1.0.1** — new icon + launch screen; price now renders instantly on-device
   (the sold-comps lookup that never shipped was removed along with its caption).
@@ -84,14 +94,19 @@ Free to use. No ads, no account required. Find out what your stuff is worth with
 Most listing metadata carries over from the last version untouched. These are the
 things a new version actually makes you handle:
 
-- [ ] **Version string** — `mobile/app.json` → `expo.version` is `1.0.2`. The build
+- [ ] **Version string** — `mobile/app.json` → `expo.version` is `1.0.3`. The build
       number is managed remotely (`appVersionSource: "remote"` in `eas.json`) and
       `autoIncrement` bumps it on the next production build. Don't set it by hand.
-- [ ] **New build** — the icon lives in the binary, so this needs `eas build -p ios
-      --profile production`, not an OTA update. Then `eas submit -p ios`.
+- [ ] **1.0.2 out of review** — App Store Connect will not accept 1.0.3 while 1.0.2
+      is still `Waiting for Review` or `In Review`. Check before submitting.
+- [ ] **New build** — this build changes JS only, so an OTA update could in principle
+      carry it. Ship it as a real build anyway: OTA channels are keyed to the app
+      version, so a 1.0.3 update never reaches the 1.0.2 installs that make up the
+      entire user base. `eas build -p ios --profile production`, then `eas submit -p ios`.
 - [ ] **What's New** — paste the block above. Mandatory field on every update.
-- [ ] **Screenshots** — no change needed for the icon. The app UI never renders the
-      icon asset, so the existing screenshots still match what a reviewer sees.
+- [ ] **Screenshots** — not required to change. The result screen now reads
+      "Estimated value" for originals and can show a provenance line under the
+      price, but existing screenshots show a resale item, which still matches.
       (Screenshot 3 may still show the removed price caption from before 1.0.1 —
       worth a look, but not a blocker.)
 - [ ] **Export compliance** — already declared in `app.json`
@@ -108,8 +123,8 @@ things a new version actually makes you handle:
 
 ### Note on runtime version
 
-`app.json` sets `runtimeVersion.policy: "appVersion"`. Bumping to 1.0.2 starts a new
-OTA channel: updates published for 1.0.0 will no longer reach 1.0.2 installs, and
+`app.json` sets `runtimeVersion.policy: "appVersion"`. Bumping to 1.0.3 starts a new
+OTA channel: updates published for 1.0.2 will no longer reach 1.0.3 installs, and
 vice versa. Expected — just don't expect an OTA to patch both at once.
 
 ## App Privacy questionnaire (App Store Connect → App Privacy)
