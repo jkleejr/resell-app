@@ -65,3 +65,41 @@ export function completeSentences(text: string): string {
   );
   return cut === -1 ? "" : text.slice(0, cut + 1).trim();
 }
+
+/**
+ * Sentences that report what the model could not work out, or that hand the
+ * question to the buyer. Both are the same move — the model has run out of
+ * facts and reaches for the one thing it always has left.
+ *
+ * The prompt forbids all of this at length and mostly obeys, but "mostly" is
+ * not a guarantee, and adding a worked WRONG example made one photo reproduce
+ * it verbatim. So the rule is enforced here instead, where it cannot drift.
+ *
+ * Deliberately narrow. "Charger not included" and "No saucer included" are
+ * real, useful listing facts and must survive; what is caught is uncertainty
+ * about the IDENTIFICATION ("model year not visible") and instructions to the
+ * buyer ("please verify before purchasing").
+ */
+const HEDGE_PATTERNS: RegExp[] = [
+  /\bnot (?:visible|listed|confirmed|verified|specified|identifiable|discernible|legible)\b/i,
+  /\b(?:cannot|can't|could not|couldn't|unable to) (?:be )?(?:confirm|verify|determine|identify|read)/i,
+  /\bplease (?:verify|confirm|inquire|ask|contact|message|check)\b/i,
+  /\b(?:inquire|message me|contact me|ask before (?:buying|purchasing)|ask for details)\b/i,
+  /\b(?:exact|specific) (?:year|model|make|specs?|specifications?|size)\b[^.!?]*\bnot\b/i,
+  /\b(?:unknown|unclear|undetermined|unverified)\b/i,
+];
+
+/**
+ * Drop whole sentences that hedge, keeping the ones that state facts.
+ *
+ * Works at sentence granularity because that is the unit the failure arrives
+ * in — the model finishes its real description and then appends a caveat. An
+ * empty result is fine and means every sentence was a caveat.
+ */
+export function dropHedges(text: string): string {
+  if (!text) return "";
+  const kept = text
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !HEDGE_PATTERNS.some((re) => re.test(sentence)));
+  return kept.join(" ").trim();
+}

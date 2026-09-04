@@ -12,7 +12,7 @@ import {
   type AnalyzeResult,
   type MediaType,
 } from "./schema.js";
-import { cleanText, completeSentences } from "./text.js";
+import { cleanText, completeSentences, dropHedges } from "./text.js";
 
 // Sonnet 4.6 is the default: vision-capable, supports structured outputs, and
 // cheap enough to run per-scan. Override with the MODEL env var to A/B test a
@@ -65,6 +65,14 @@ Rules:
   • Describe only what the buyer receives. Anything that was true of the moment the shutter opened but is not true of the item in the box is out: what is on the screen, what it is plugged into, what it is resting on, what is sitting next to it, what is inside it that does not come with it. A powered-on display is showing the seller's desktop, not a feature of the laptop, and a sentence about it is a sentence the buyer has to read past to find out what they are buying.
   • Never report what you could not determine. "Exact year not confirmed", "model unknown", "specs unverified" are all the same move, and so is handing the question to the buyer: never write "inquire", "message me", "contact for details", or "ask before buying". The seller knows things you cannot see and will add them; a gap in your copy is an invitation for them to fill it, while a sentence about the gap is something they have to notice and delete. A fact you cannot state is a fact you leave out, silently.
   • Do not offer alternatives. "A paint swatch, colour reference card, or fabric sample" is three guesses wearing one sentence. Name the one thing you are most confident it is, at whatever level of detail you can actually stand behind.
+  • The three rules above are the ones that break most often, and they break the same way: you run out of things you can assert, and reach for filler. What that filler looks like in practice, and what to write instead:
+      WRONG "Apple MacBook Pro laptop in silver aluminum. The exact year and processor generation are not listed here, so please verify the specs before purchasing."
+      RIGHT "Apple MacBook Pro laptop in silver aluminum with a black backlit keyboard and large trackpad."
+      WRONG "Men's black faux or genuine leather biker jacket with an asymmetric zip front."
+      RIGHT "Men's black biker jacket with an asymmetric zip front, quilted shoulder panels, and silver-tone hardware."
+      WRONG "White ceramic espresso or cappuccino cup in a small, rounded style."
+      RIGHT "Small white ceramic cup with a rounded body."
+    In every pair the RIGHT version is shorter and says less. That is the trade: the seller can add the model year, the leather, the intended drink. They cannot easily notice and delete a sentence that reads as if it belongs.
   • When you are unsure, become LESS SPECIFIC — never less certain. Drop the detail you can't verify and state what you can. "Glass bottle of golden facial oil with a white cap, travel size" is correct when the label is illegible; "what appears to be an oil or serum, label not clearly legible" is not.
   • No sales pitch, no imagined buyer, no filler. Cut "ideal for", "perfect for", "great for anyone who", "a must-have", "ready to hang", "ready to display", "ready to use", "a great addition to". Anything describing what the buyer could DO with the item is filler; only what the item IS belongs here.
   • Do NOT mention price, shipping, returns, or payment. No markdown, hashtags, or emoji.
@@ -213,10 +221,15 @@ function normalize(raw: unknown): AnalyzeResult {
     priceConfidence,
     craftLevel,
     estimatedValueUSD: { low: Math.round(low), high: Math.round(high) },
-    // Two passes, because the two ways this text goes wrong are different:
+    // Three passes, because the three ways this text goes wrong are different:
     // cleanText removes what the app would render as a stray blank line,
-    // completeSentences removes a tail that never finished.
-    listingDescription: completeSentences(cleanText(r.listingDescription)),
+    // dropHedges removes a caveat sentence the prompt already forbids, and
+    // completeSentences removes a tail that never finished. Order matters —
+    // dropping a sentence can expose a new last one, so the terminator check
+    // runs last.
+    listingDescription: completeSentences(
+      dropHedges(cleanText(r.listingDescription)),
+    ),
     recommendedPlatform: oneOf(r.recommendedPlatform, PLATFORM_NAMES, "eBay"),
     recommendationReason: cleanText(r.recommendationReason),
     expectedSpeed: oneOf(r.expectedSpeed, EXPECTED_SPEED, "moderate"),
