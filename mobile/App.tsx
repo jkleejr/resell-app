@@ -233,6 +233,22 @@ export default function App() {
     Boolean(result?.brand) &&
     result?.priceConfidence === "high";
 
+  // How sure the app is, in two words, or nothing at all.
+  //
+  // "very certain" is reserved for a number a web search actually refined —
+  // the only case where something outside the model's own memory backed the
+  // price. "pretty certain" is the model alone, but with all three of its
+  // own checks passed. Deliberately not worded as sold-price evidence: the
+  // search reads asking prices off live listings, and sold data is exactly
+  // what is NOT on the open web (see shouldVerify in lib/handler.ts).
+  const certainty = result
+    ? result.priceBasis === "verified"
+      ? "very certain"
+      : confidentResale
+        ? "pretty certain"
+        : null
+    : null;
+
   const comparison =
     price && result
       ? buildComparison(price.median, result.recommendedPlatform)
@@ -352,9 +368,18 @@ export default function App() {
                 <Badge
                   label={CONDITION_LABELS[result.condition] ?? result.condition}
                 />
-                {result.specificity === "generic" && (
-                  <Badge label="best guess" subtle />
-                )}
+                {/* Three states, and only two of them say anything. "best
+                    guess" when the product was never pinned down; a blue
+                    certainty badge when it was AND the price has something
+                    behind it. The large middle — identified but in a market the
+                    model admits it doesn't follow — stays silent on purpose,
+                    the same way the price note does: a certainty claim we
+                    can't back is worth less than no claim. */}
+                {result.specificity === "generic" ? (
+                  <Badge label="best guess" tone="caution" />
+                ) : certainty ? (
+                  <Badge label={certainty} tone="confident" />
+                ) : null}
               </View>
               {result.brand ? (
                 <Text style={styles.brandLine}>Brand: {result.brand}</Text>
@@ -576,12 +601,31 @@ export default function App() {
   );
 }
 
-function Badge({ label, subtle }: { label: string; subtle?: boolean }) {
+// Neutral by default. The two tinted tones are the only place the app states
+// how much to trust what it just told you: amber when it is guessing, blue when
+// it is not. Nothing in between gets a badge — see the badge row for why.
+function Badge({
+  label,
+  tone,
+}: {
+  label: string;
+  tone?: "caution" | "confident";
+}) {
+  const box =
+    tone === "caution"
+      ? styles.badgeCaution
+      : tone === "confident"
+        ? styles.badgeConfident
+        : null;
+  const text =
+    tone === "caution"
+      ? styles.badgeTextCaution
+      : tone === "confident"
+        ? styles.badgeTextConfident
+        : null;
   return (
-    <View style={[styles.badge, subtle && styles.badgeSubtle]}>
-      <Text style={[styles.badgeText, subtle && styles.badgeTextSubtle]}>
-        {label}
-      </Text>
+    <View style={[styles.badge, box]}>
+      <Text style={[styles.badgeText, text]}>{label}</Text>
     </View>
   );
 }
@@ -708,10 +752,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  badgeSubtle: {
+  badgeCaution: {
     backgroundColor: "#1C1A12",
     borderWidth: 1,
     borderColor: "#3A3320",
+  },
+  // The blue counterpart, built the same way: a barely-there tinted ground, a
+  // muted border, and the saturated colour carried by the text.
+  badgeConfident: {
+    backgroundColor: "#101A26",
+    borderWidth: 1,
+    borderColor: "#21374F",
   },
   badgeText: {
     color: "#fff",
@@ -719,7 +770,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textTransform: "capitalize",
   },
-  badgeTextSubtle: { color: "#F5D88A" },
+  badgeTextCaution: { color: "#F5D88A" },
+  badgeTextConfident: { color: "#7FBEF5" },
   brandLine: { color: "#C8C8D0", fontSize: 15 },
   keywords: { color: "#7A7A86", fontSize: 13 },
   nudge: {
