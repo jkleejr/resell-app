@@ -18,6 +18,21 @@ import { BACKEND_URL } from "./config";
 import { getDeviceId } from "./device";
 import { buildComparison, speedLabel, toPrice } from "./pricing";
 
+// How long a scan actually takes, so the wait can say so.
+//
+// Measured against production: three plain scans ran 6.3s, 6.3s and 6.6s. The
+// verified path adds a web search and a second inference pass on top of that —
+// 8-15s by lib/verify.ts's own measurement, hard-capped by its 20s timeout.
+const PLAIN_SCAN_SECONDS = 6;
+const VERIFIED_SCAN_SECONDS = 20;
+
+// The client is never told which path the server took: whether to run the price
+// check is decided AFTER the photo is identified, so it cannot be known when
+// the request goes out. Overrunning a plain scan is the only signal available,
+// and it is a reliable one — past this mark the extra time IS the price check.
+// Set clear of the slowest plain scan observed rather than on top of it.
+const SEARCH_TELL_SECONDS = 8;
+
 // Mirrors the backend /api/analyze contract (lib/schema.ts).
 type AnalyzeResult = {
   title: string;
@@ -61,6 +76,7 @@ const prettyCategory = (c: string) => c.replace(/_/g, " ");
 
 export default function App() {
   const [status, setStatus] = useState<Status>("idle");
+  const [elapsed, setElapsed] = useState(0);
   const [images, setImages] = useState<CapturedImage[]>([]);
   const [hint, setHint] = useState("");
   const [result, setResult] = useState<AnalyzeResult | null>(null);
@@ -151,6 +167,19 @@ export default function App() {
     setImages((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Seconds since the current scan started. Only runs while one is in flight,
+  // and resets on each new scan, so a retry starts its estimate over.
+  useEffect(() => {
+    if (status !== "working") return;
+    setElapsed(0);
+    const started = Date.now();
+    const id = setInterval(
+      () => setElapsed(Math.round((Date.now() - started) / 1000)),
+      500,
+    );
+    return () => clearInterval(id);
+  }, [status]);
+
   async function identify() {
     if (images.length === 0) return;
     setError(null);
@@ -232,6 +261,15 @@ export default function App() {
     result?.specificity === "exact" &&
     Boolean(result?.brand) &&
     result?.priceConfidence === "high";
+
+  // A plain scan should be back by now, so this one is running the price check.
+  const searching = status === "working" && elapsed >= SEARCH_TELL_SECONDS;
+
+  const waitEstimate = !searching
+    ? `~${PLAIN_SCAN_SECONDS} seconds`
+    : elapsed <= VERIFIED_SCAN_SECONDS
+      ? `~${VERIFIED_SCAN_SECONDS} seconds`
+      : null;
 
   // How sure the app is, in two words, or nothing at all.
   //
@@ -327,7 +365,15 @@ export default function App() {
             )}
             <View style={styles.center}>
               <ActivityIndicator size="large" color="#fff" />
-              <Text style={styles.muted}>Identifying…</Text>
+              <Text style={styles.muted}>
+                {searching ? "Checking recent listings…" : "Identifying…"}
+              </Text>
+              {/* Drops away once the longer estimate is spent too. A number
+                  already blown past is worse than no number — it reads as the
+                  app being stuck rather than being slow. */}
+              {waitEstimate ? (
+                <Text style={styles.waitNote}>{waitEstimate}</Text>
+              ) : null}
             </View>
           </>
         )}
@@ -743,6 +789,7 @@ const styles = StyleSheet.create({
   hintTip: { color: "#7A7A86", fontSize: 12, lineHeight: 17 },
   center: { alignItems: "center", gap: 12, paddingVertical: 24 },
   muted: { color: "#A8A8B0", fontSize: 15 },
+  waitNote: { color: "#7A7A86", fontSize: 13 },
   card: { backgroundColor: "#17171C", borderRadius: 20, padding: 20, gap: 10 },
   title: { color: "#fff", fontSize: 22, fontWeight: "700", lineHeight: 28 },
   badgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
