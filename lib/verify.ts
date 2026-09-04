@@ -5,6 +5,7 @@ import {
   type AnalyzeResult,
   type VerifiedPrice,
 } from "./schema.js";
+import { cleanText } from "./text.js";
 
 // The optional second pass: one web search to sanity-check the model's own
 // price, run ONLY when lib/handler.ts decides it's worth a cent.
@@ -273,10 +274,7 @@ function interpret(
     }
   }
 
-  const note = typeof r.note === "string"
-    ? r.note.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ").trim().slice(0, 80)
-    : "";
+  const note = cleanText(r.note).slice(0, 80);
 
   // Length backstop. The prompt asks for under 40 characters and mostly gets
   // it, but it drifts — "Based on Etsy listings" one run, "Based on active

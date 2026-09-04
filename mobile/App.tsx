@@ -471,7 +471,12 @@ export default function App() {
               <Text style={styles.sectionLabel}>Ready-to-post listing</Text>
 
               <Text style={styles.listingFieldLabel}>Title</Text>
-              <Text style={styles.listingTitle}>{result.title}</Text>
+              {/* Selectable, and with no numberOfLines: the whole listing text
+                  is on screen, so what the seller reads is exactly what the
+                  copy button puts on the clipboard. */}
+              <Text style={styles.listingTitle} selectable>
+                {result.title}
+              </Text>
               <Pressable
                 onPress={() => copyText(result.title, "title")}
                 style={({ pressed }) => [
@@ -487,7 +492,7 @@ export default function App() {
               {result.listingDescription ? (
                 <>
                   <Text style={styles.listingFieldLabel}>Description</Text>
-                  <Text style={styles.listingBody}>
+                  <Text style={styles.listingBody} selectable>
                     {result.listingDescription}
                   </Text>
                   <Pressable

@@ -12,12 +12,20 @@ import {
   type AnalyzeResult,
   type MediaType,
 } from "./schema.js";
+import { cleanText, completeSentences } from "./text.js";
 
 // Sonnet 4.6 is the default: vision-capable, supports structured outputs, and
 // cheap enough to run per-scan. Override with the MODEL env var to A/B test a
 // cheaper model (e.g. MODEL=claude-haiku-4-5, ~3x cheaper) against it on real
 // photos — both support vision + structured outputs, so no other code changes.
 const MODEL = process.env.MODEL ?? "claude-sonnet-4-6";
+
+// Headroom, not a budget. A normal scan spends ~200 output tokens, so this
+// never costs anything extra — but the schema has fifteen fields and the
+// description sits twelfth, which means a cap the model can actually reach gets
+// spent on the analysis and truncates the copy the seller pastes. A scan that
+// stopped mid-sentence is what this number is set against.
+const MAX_OUTPUT_TOKENS = 4096;
 
 // Per-1M-token prices (USD) for the cost log below. Keep in sync with the
 // models we actually switch between; unknown models just skip the cost line.
@@ -32,7 +40,7 @@ Most items you see are mass-produced goods being resold secondhand, and that is 
 
 Rules:
 - Identify the single main item. Ignore the background, hands, packaging clutter, and any other objects.
-- title: a concise marketplace-style title — brand (if known) + item type + key attributes + colour/material. Keep it under ~80 characters.
+- title: a concise marketplace-style title — brand (if known) + item type + key attributes + colour/material. Keep it under ~80 characters. It names the ITEM, never the photograph: nothing about how the thing is posed, angled, lit, opened, or arranged, and no word that only makes sense while looking at the picture. "Apple MacBook Pro 13-inch Laptop, Silver" is a title a buyer searches for; "Laptop Computer with Display Open" is a caption, and pasting a caption into a listing throws away the brand and model the search traffic actually comes from.
 - category: choose the single best fit from the allowed set. Use "jewelry" for bracelets, necklaces, rings, earrings, and watches; use "accessory" for bags, belts, wallets, sunglasses, hats, and scarves. Reserve "clothing" for worn garments.
 - brand: the brand name ONLY if you can identify it with high confidence from a visible logo, label, or unmistakable design. If you are not confident, return an empty string "". Never guess a brand.
 - condition: estimate from visible wear. Default to "good" for a normal used item with no visible damage. Use "new"/"like_new" only with clear evidence (tags attached, pristine surfaces); use "fair"/"poor" only for visible damage or heavy wear. A newly made original piece is "new" — but do not lean on condition when pricing it, since it carries no information there.
@@ -51,7 +59,8 @@ Rules:
 - estimatedValueUSD: a whole-dollar range with low < high. What that number MEANS depends on valuationBasis:
   • "resale" — the RESALE value: what this item would realistically sell for SECONDHAND today (what a buyer would pay a private seller on a resale marketplace). This is NOT the original retail/store price and NOT replacement cost; a used item is normally well below retail. Base it on the item type, brand, and apparent condition.
   • "original" — the PRIMARY asking price: what the maker could realistically ask. Do NOT discount from retail — there is no retail, this piece has never been sold, and the seller IS the primary market. Anchor on medium, size, execution, and finish. For 2D artwork a common convention is (height + width in inches) × roughly $1-4 per inch for a maker with no established sales history. Assume no established following unless told otherwise, and keep the range wide: the maker's audience, not the object, drives the top end.
-- listingDescription: 1-3 short sentences the seller pastes straight into a listing, unedited. This is buyer-facing copy, NOT your analysis of the photo. Write only plain statements of fact about the item — what it is, its colour, material, size, condition — and include a detail ONLY if you can state it flatly. That list is a menu, not a checklist: every entry you cannot assert outright is one you leave out. Condition in particular is optional. A description that never mentions condition is correct; "appears to be in good condition" is not, and reaching for a hedge is the signal you should have dropped the detail instead.
+- listingDescription: 2-4 complete sentences the seller pastes straight into a listing, unedited. Open with what the item is, then give the facts a buyer decides on: brand and model, colour, material, size or capacity, and the features that are plainly there. This is buyer-facing copy, NOT your analysis of the photo — never write that something is "visible", "shown", "pictured", "in frame", or describe where in the shot it sits. Write only plain statements of fact about the item, and include a detail ONLY if you can state it flatly. That list is a menu, not a checklist: every entry you cannot assert outright is one you leave out. Condition in particular is optional. A description that never mentions condition is correct; "appears to be in good condition" is not, and reaching for a hedge is the signal you should have dropped the detail instead.
+  • Finish what you start. Every sentence ends in a full stop and every last sentence is a whole thought. A short description that ends cleanly is always better than a longer one that stops mid-clause — the seller pastes this without reading it, so a dangling "and" ships straight to buyers.
   • Never hedge. Do not write "appears to be", "looks like", "seems", "possibly", "presumably", "likely", "probably", "hard to tell", or any remark that a label is unreadable or the item unidentified. Your uncertainty is already reported in brand and specificity; it must never appear in this text.
   • Do not offer alternatives. "A paint swatch, colour reference card, or fabric sample" is three guesses wearing one sentence. Name the one thing you are most confident it is, at whatever level of detail you can actually stand behind.
   • When you are unsure, become LESS SPECIFIC — never less certain. Drop the detail you can't verify and state what you can. "Glass bottle of golden facial oil with a white cap, travel size" is correct when the label is illegible; "what appears to be an oil or serum, label not clearly legible" is not.
@@ -112,7 +121,7 @@ export async function analyzeImage(
   // formatting tokens into string fields on degenerate inputs.
   const response = await client.messages.create({
     model: MODEL,
-    max_tokens: 1024,
+    max_tokens: MAX_OUTPUT_TOKENS,
     thinking: { type: "disabled" },
     system: SYSTEM_PROMPT,
     messages: [
@@ -141,6 +150,18 @@ export async function analyzeImage(
       (cost !== undefined ? ` cost=$${cost.toFixed(4)}` : ""),
   );
 
+  // Structured outputs guarantee the SHAPE, not that the model finished
+  // talking. Hitting the cap cuts a string wherever it happened to be — the
+  // listing text most of all, since it is the longest field — and the result
+  // still parses, so nothing downstream would notice. Fail instead: a scan the
+  // seller retries beats a listing that ends on "and".
+  if (response.stop_reason === "max_tokens") {
+    throw new Error(
+      `Response hit the ${MAX_OUTPUT_TOKENS}-token cap and was truncated` +
+        ` (out=${u.output_tokens})`,
+    );
+  }
+
   const textBlock = response.content.find((b) => b.type === "text");
   if (!textBlock || textBlock.type !== "text") {
     throw new Error("Model returned no text content");
@@ -150,8 +171,9 @@ export async function analyzeImage(
 }
 
 // Structured outputs guarantee the shape, but we still defend against bad
-// values: out-of-range prices, and any markup/control characters the model
-// might leak into string fields on degenerate inputs.
+// values: out-of-range prices, any markup or invisible characters the model
+// might leak into string fields on degenerate inputs, and copy that does not
+// finish its last sentence.
 function normalize(raw: unknown): AnalyzeResult {
   const r = raw as Record<string, unknown>;
 
@@ -189,7 +211,10 @@ function normalize(raw: unknown): AnalyzeResult {
     priceConfidence,
     craftLevel,
     estimatedValueUSD: { low: Math.round(low), high: Math.round(high) },
-    listingDescription: cleanText(r.listingDescription),
+    // Two passes, because the two ways this text goes wrong are different:
+    // cleanText removes what the app would render as a stray blank line,
+    // completeSentences removes a tail that never finished.
+    listingDescription: completeSentences(cleanText(r.listingDescription)),
     recommendedPlatform: oneOf(r.recommendedPlatform, PLATFORM_NAMES, "eBay"),
     recommendationReason: cleanText(r.recommendationReason),
     expectedSpeed: oneOf(r.expectedSpeed, EXPECTED_SPEED, "moderate"),
@@ -197,16 +222,6 @@ function normalize(raw: unknown): AnalyzeResult {
     priceBasis: "estimate",
     priceNote: "",
   };
-}
-
-// Strip control characters and tag-like fragments, then collapse whitespace.
-function cleanText(value: unknown): string {
-  if (typeof value !== "string") return "";
-  return value
-    .replace(/[\u0000-\u001F\u007F]/g, " ")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 // Brand must look like a real brand, never leaked markup. When in doubt, blank.
