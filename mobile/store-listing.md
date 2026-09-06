@@ -28,10 +28,20 @@ Paste into App Store Connect → the new version's **What's New in This Version*
 Required for every update; it's the one listing field a new version forces you to fill in.
 
 ```
+• Listings no longer arrive cut off — titles name the item itself, and descriptions always finish their last sentence
+• New badges show when a result is "pretty certain" or "very certain", not just when it's a best guess
+• Descriptions stick to plain facts about the item, with no hedging or filler
+• The scan screen now tells you roughly how long the wait will be
 • Handmade and original items are now priced as one-of-a-kind pieces rather than secondhand goods
 • Some prices now show what they're based on
 • A clearer message when you reach the daily scan limit
 ```
+
+> The last three bullets were written for the 1.0.3 build already uploaded (build 9,
+> 31 Aug); the first four cover the listing-quality work that landed after it. Keep all
+> seven **only while 1.0.3 is unreleased** — the field has to cover everything since
+> 1.0.2. If 1.0.3 has already gone live, a second binary needs `expo.version` bumped to
+> 1.0.4 and the note cut back to the first four bullets, since the other three shipped.
 
 ### Release-note history
 
@@ -41,6 +51,16 @@ Required for every update; it's the one listing field a new version forces you t
   offering a retry that cannot succeed. The valuation itself shipped earlier via
   the backend and is already live for 1.0.x installs; this build is what makes it
   legible on screen.
+
+  Listing quality, added after build 9 was uploaded: descriptions no longer
+  arrive truncated (`cleanText` now strips U+0085 and the rest of the C1 and
+  zero-width families, and an over-long response fails the scan instead of
+  going out half-written), titles name the item rather than narrating the
+  photo, hedges and buyer-directed caveats are stripped in code by `dropHedges`
+  rather than merely discouraged in the prompt, the badge row can now say
+  "pretty certain" / "very certain" instead of only flagging a best guess, and
+  the wait carries a measured estimate that relabels itself when the price
+  check runs long.
 - **1.0.2** — new app icon (second revision of the scan-tag mark).
 - **1.0.1** — new icon + launch screen; price now renders instantly on-device
   (the sold-comps lookup that never shipped was removed along with its caption).
