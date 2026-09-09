@@ -3,9 +3,9 @@
 //
 // The backend is public, so anyone with the app URL can call /api/analyze and
 // spend our Anthropic credits. This module limits that:
-//   - per-device daily cap: one device gets at most DAILY_DEVICE_CAP scans/UTC-day (50)
+//   - per-device daily cap: one device gets at most DAILY_DEVICE_CAP scans/UTC-day (100)
 //   - per-device daily search allowance: at most SEARCH_DEVICE_CAP paid price
-//     checks/UTC-day (20) for that same device
+//     checks/UTC-day (25) for that same device
 //   - all-time total counter: cumulative scans across everyone (for the stats UI)
 //   - optional global daily cap: at most GLOBAL_DAILY_CAP scans/UTC-day across ALL
 //     users — a circuit breaker on total daily spend. OFF unless the env var is set.
@@ -16,7 +16,7 @@
 
 const REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
-const DEVICE_CAP = Number(process.env.DAILY_DEVICE_CAP ?? 50);
+const DEVICE_CAP = Number(process.env.DAILY_DEVICE_CAP ?? 100);
 const GLOBAL_DAILY_CAP = process.env.GLOBAL_DAILY_CAP
   ? Number(process.env.GLOBAL_DAILY_CAP)
   : null;
@@ -128,7 +128,7 @@ export async function checkAndRecordScan(
 // way a shared pool did. What bounds that now is GLOBAL_DAILY_CAP — a search
 // can never outnumber the scan that triggered it — plus the Anthropic monthly
 // spend limit behind everything.
-const SEARCH_DEVICE_CAP = Number(process.env.SEARCH_DEVICE_CAP ?? 20);
+const SEARCH_DEVICE_CAP = Number(process.env.SEARCH_DEVICE_CAP ?? 25);
 
 /**
  * Claim one search against this device's daily allowance.
