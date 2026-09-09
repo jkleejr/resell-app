@@ -3,7 +3,7 @@
 //
 // The backend is public, so anyone with the app URL can call /api/analyze and
 // spend our Anthropic credits. This module limits that:
-//   - per-device daily cap: one device gets at most DAILY_DEVICE_CAP scans/UTC-day (15)
+//   - per-device daily cap: one device gets at most DAILY_DEVICE_CAP scans/UTC-day (50)
 //   - per-device daily search allowance: at most SEARCH_DEVICE_CAP paid price
 //     checks/UTC-day (20) for that same device
 //   - all-time total counter: cumulative scans across everyone (for the stats UI)
@@ -16,7 +16,7 @@
 
 const REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
-const DEVICE_CAP = Number(process.env.DAILY_DEVICE_CAP ?? 15);
+const DEVICE_CAP = Number(process.env.DAILY_DEVICE_CAP ?? 50);
 const GLOBAL_DAILY_CAP = process.env.GLOBAL_DAILY_CAP
   ? Number(process.env.GLOBAL_DAILY_CAP)
   : null;
@@ -124,10 +124,6 @@ export async function checkAndRecordScan(
 // way a shared pool did. What bounds that now is GLOBAL_DAILY_CAP — a search
 // can never outnumber the scan that triggered it — plus the Anthropic monthly
 // spend limit behind everything.
-//
-// NOTE: this sits ABOVE the 15-scan device cap, and a search can only ride on a
-// scan — so today it can never actually bind. It is a backstop, not a working
-// limit; lower it below the scan cap if you want it to ration anything.
 const SEARCH_DEVICE_CAP = Number(process.env.SEARCH_DEVICE_CAP ?? 20);
 
 // Resale prices move slowly; a fortnight-old comp is still a good comp, and
