@@ -1,12 +1,9 @@
-import { createHash } from "node:crypto";
 import { analyzeImage, type ImageInput } from "./analyze.js";
 import { priceItem } from "./price.js";
 import { isValidMediaType, type AnalyzeResult } from "./schema.js";
 import {
-  cacheVerification,
   checkAndRecordScan,
   claimSearchBudget,
-  getCachedVerification,
   getTotalScans,
 } from "./usage.js";
 import { verifyPrice } from "./verify.js";
@@ -138,50 +135,15 @@ function shouldVerify(r: AnalyzeResult): boolean {
   return r.valuationBasis === "original";
 }
 
-// Bump when the verification prompt changes in a way that should change its
-// answers. Cached entries live 14 days, so without this a prompt fix reaches
-// new items and silently leaves old ones serving the previous wording — which
-// is exactly what happened once: production kept returning a note the prompt no
-// longer produced, and it looked like the deploy had failed.
-const VERIFY_PROMPT_VERSION = "v2";
-
-// Cache identity: what makes two scans "the same item" for pricing purposes.
-// Deliberately excludes the photo — two people photographing the same jacket
-// should share one lookup. craftLevel is in here because it moves the piece
-// between market tiers, so two paintings with the same title and different
-// grades are genuinely different valuations.
-function verifyCacheKey(r: AnalyzeResult): string {
-  const identity = [
-    VERIFY_PROMPT_VERSION,
-    r.valuationBasis,
-    r.craftLevel,
-    r.brand.toLowerCase(),
-    r.title.toLowerCase(),
-    r.condition,
-  ].join("|");
-  return createHash("sha1").update(identity).digest("hex").slice(0, 20);
-}
-
 async function maybeVerifyPrice(
   result: AnalyzeResult,
   deviceId?: string,
 ): Promise<AnalyzeResult> {
   if (!shouldVerify(result)) return result;
 
-  const key = verifyCacheKey(result);
-
-  // Cache first: a hit costs nothing and makes a repeat scan faster, not just
-  // cheaper. Cached ranges skipped the sanity check on the way out, so they've
-  // already been vetted once.
-  const cached = await getCachedVerification(key);
-  if (cached) {
-    console.log("[verify] cache hit");
-    return applyVerified(result, cached);
-  }
-
-  // Only now do we spend, against this device's own daily allowance. Fails
-  // closed: no allowance, no search. No note either — nothing was attempted, so
-  // there is nothing to tell the seller about.
+  // Spend against this device's own daily allowance. Fails closed: no
+  // allowance, no search. No note either — nothing was attempted, so there is
+  // nothing to tell the seller about.
   if (!(await claimSearchBudget(deviceId))) return result;
 
   const verified = await verifyPrice(result);
@@ -195,7 +157,6 @@ async function maybeVerifyPrice(
     return { ...result, priceNote: "Couldn't find listings" };
   }
 
-  await cacheVerification(key, verified);
   return applyVerified(result, verified);
 }
 

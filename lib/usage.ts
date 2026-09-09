@@ -1,5 +1,5 @@
-// Per-device daily cap, global scan counters, and the price-verification
-// budget/cache — all backed by Upstash Redis (REST).
+// Per-device daily caps, global scan counters, and the price-verification
+// search allowance — all backed by Upstash Redis (REST).
 //
 // The backend is public, so anyone with the app URL can call /api/analyze and
 // spend our Anthropic credits. This module limits that:
@@ -107,12 +107,16 @@ export async function checkAndRecordScan(
   return { allowed: true };
 }
 
-// --- Price verification: budget + cache ----------------------------------
+// --- Price verification: the search allowance -----------------------------
 //
 // The optional web-search pass (lib/verify.ts) costs about a cent each time it
-// runs. These two helpers are what bound that: a daily allowance each device
-// spends on its own, and a cache so the same item is never looked up twice in
-// a fortnight.
+// runs. This is what bounds it: a daily allowance each device spends on its own.
+//
+// There was also a 14-day cache of past verifications here. It was removed
+// because it could not hit: its key included the model's free-text title, and
+// the search only ever runs on one-of-a-kind pieces, so no two scans could
+// produce the same key except a rescan of the same object. The allowance above
+// is what actually protects spending; the cache was complexity earning nothing.
 
 // Per device, per UTC day — the same shape as the scan cap above, and for the
 // same reason. A shared pool is a race: whoever scans first in the morning can
@@ -125,10 +129,6 @@ export async function checkAndRecordScan(
 // can never outnumber the scan that triggered it — plus the Anthropic monthly
 // spend limit behind everything.
 const SEARCH_DEVICE_CAP = Number(process.env.SEARCH_DEVICE_CAP ?? 20);
-
-// Resale prices move slowly; a fortnight-old comp is still a good comp, and
-// re-running the search would cost a cent to learn almost nothing.
-const VERIFY_CACHE_TTL_SECONDS = 1_209_600; // 14 days
 
 /**
  * Claim one search against this device's daily allowance.
@@ -164,42 +164,6 @@ export async function claimSearchBudget(
     return false;
   }
   return true;
-}
-
-/** Cached verification for an item identity, or null on miss/misconfig/error. */
-export async function getCachedVerification(
-  key: string,
-): Promise<{ low: number; high: number; note: string } | null> {
-  if (!configured()) return null;
-
-  const out = await pipeline([["GET", `verify:${key}`]]);
-  if (!out) return null;
-  const raw = (out[0] as { result?: unknown })?.result;
-  if (typeof raw !== "string") return null;
-
-  try {
-    const v = JSON.parse(raw) as Record<string, unknown>;
-    if (typeof v.low !== "number" || typeof v.high !== "number") return null;
-    return {
-      low: v.low,
-      high: v.high,
-      note: typeof v.note === "string" ? v.note : "",
-    };
-  } catch {
-    return null;
-  }
-}
-
-/** Store a verification. Best-effort — a failed write just means a future miss. */
-export async function cacheVerification(
-  key: string,
-  value: { low: number; high: number; note: string },
-): Promise<void> {
-  if (!configured()) return;
-  await pipeline([
-    ["SET", `verify:${key}`, JSON.stringify(value)],
-    ["EXPIRE", `verify:${key}`, VERIFY_CACHE_TTL_SECONDS],
-  ]);
 }
 
 // All-time total scans across everyone, for the stats counter. Null if unknown
