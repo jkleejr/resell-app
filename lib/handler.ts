@@ -29,6 +29,9 @@ export async function handleAnalyzeRequest(
   body: unknown,
   ctx: RequestContext = {},
 ): Promise<HandlerResponse> {
+  // Start the clock before any work, so the deadline handed to verification
+  // reflects everything this request has already spent.
+  const startedAt = Date.now();
   const input = (body ?? {}) as Record<string, unknown>;
 
   // New shape: { images: [{ image, mediaType }], hint }. Legacy single-image
@@ -87,7 +90,7 @@ export async function handleAnalyzeRequest(
 
   try {
     const result = await analyzeImage(images, hint);
-    const priced = await maybeVerifyPrice(result, ctx.deviceId);
+    const priced = await maybeVerifyPrice(result, ctx.deviceId, startedAt);
     return { status: 200, body: priced as unknown as Record<string, unknown> };
   } catch (err) {
     console.error("[analyze] failed:", err);
@@ -104,6 +107,27 @@ export async function handleAnalyzeRequest(
 // Below this the search isn't worth its own cost — a cent and several seconds
 // to refine a $30 estimate helps nobody.
 const VERIFY_MIN_USD = Number(process.env.VERIFY_MIN_USD ?? 40);
+
+// The function is killed at 30s (vercel.json maxDuration), and a killed
+// function returns a platform 504 with an HTML body — no JSON, no message the
+// app can show. Everything below therefore works to a DEADLINE rather than a
+// fixed budget: the vision pass spends what it spends, and verification gets
+// only what is left.
+//
+// Without this the two simply add up and hope. A slow four-photo vision call
+// (8-12s) plus a full 20s verification is 28-32s, which straddles the limit.
+const FUNCTION_BUDGET_MS = 30_000;
+
+// Held back so the result can be serialised and written after verification
+// returns. Small, but it is the difference between a complete response and no
+// response at all.
+const RESPONSE_MARGIN_MS = 3_000;
+
+// Below this there is no point starting: a search plus both inference passes
+// takes 8-15s, so anything less is an allowance spent on a call that cannot
+// finish. Skipping costs the user nothing — they get the estimate, which is
+// what a timeout would have given them anyway, just sooner.
+const MIN_VERIFY_MS = 8_000;
 
 /**
  * Decide whether one web search is worth a cent for this item.
@@ -138,15 +162,25 @@ function shouldVerify(r: AnalyzeResult): boolean {
 async function maybeVerifyPrice(
   result: AnalyzeResult,
   deviceId?: string,
+  startedAt: number = Date.now(),
 ): Promise<AnalyzeResult> {
   if (!shouldVerify(result)) return result;
+
+  // What is left of the function's own lifetime. Checked BEFORE the allowance
+  // is claimed, so a search we have no time to finish never costs anyone one.
+  const remainingMs =
+    FUNCTION_BUDGET_MS - (Date.now() - startedAt) - RESPONSE_MARGIN_MS;
+  if (remainingMs < MIN_VERIFY_MS) {
+    console.log(`[verify] skipped: only ${remainingMs}ms left of the request`);
+    return result;
+  }
 
   // Spend against this device's own daily allowance. Fails closed: no
   // allowance, no search. No note either — nothing was attempted, so there is
   // nothing to tell the seller about.
   if (!(await claimSearchBudget(deviceId))) return result;
 
-  const verified = await verifyPrice(result);
+  const verified = await verifyPrice(result, remainingMs);
   if (!verified) {
     // We searched and came back empty. Say so plainly and briefly: the scan
     // just took ten seconds longer than usual and the seller deserves to know

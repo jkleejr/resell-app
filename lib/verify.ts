@@ -23,9 +23,13 @@ import { cleanText } from "./text.js";
 
 const MODEL = process.env.VERIFY_MODEL ?? "claude-sonnet-4-6";
 
-// Total wall-clock budget for the whole verification, including the search.
-// Past this we abandon it and serve the estimate — a slow scan is a worse
-// product than an unverified one.
+// Ceiling on the whole verification, including the search. Past this we
+// abandon it and serve the estimate — a slow scan is a worse product than an
+// unverified one.
+//
+// This is a CEILING, not the budget actually used. The caller knows how much of
+// the function's own 30s limit the vision pass already spent, and passes in
+// whatever is left; this value only caps that. See maybeVerifyPrice().
 //
 // Measured: a search plus both inference passes takes 8-15s. The first budget
 // here was 9s, which cut off most of its own successes. 20s clears the observed
@@ -157,11 +161,13 @@ function describeItem(r: AnalyzeResult): string {
 
 export async function verifyPrice(
   result: AnalyzeResult,
+  budgetMs: number = TIMEOUT_MS,
 ): Promise<VerifiedPrice | null> {
   const isOriginal = result.valuationBasis === "original";
+  const timeout = Math.min(TIMEOUT_MS, budgetMs);
 
   try {
-    const client = new Anthropic({ timeout: TIMEOUT_MS, maxRetries: 0 });
+    const client = new Anthropic({ timeout, maxRetries: 0 });
 
     const response = await client.messages.create({
       model: MODEL,

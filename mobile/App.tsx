@@ -74,6 +74,19 @@ const CONDITION_LABELS: Record<string, string> = {
 
 const prettyCategory = (c: string) => c.replace(/_/g, " ");
 
+// What to show when a failed response carries no message of its own. The server
+// words everything it handles itself; what reaches here came from the platform
+// instead — a 504 when the function is killed at its time limit, whose body is
+// an HTML error page with no `error` field to read. A status code is not
+// something anyone can act on, so say what happened and what to do about it.
+function fallbackError(status: number): string {
+  if (status === 504 || status === 408) {
+    return "That took longer than expected. Please try again.";
+  }
+  if (status >= 500) return "Something went wrong on our end. Please try again.";
+  return "Something went wrong. Please try again.";
+}
+
 export default function App() {
   const [status, setStatus] = useState<Status>("idle");
   const [elapsed, setElapsed] = useState(0);
@@ -207,7 +220,7 @@ export default function App() {
         // retry that cannot succeed — every further attempt would just be a
         // round trip to the same refusal.
         if (res.status === 429) setLimitReached(true);
-        throw new Error(body.error ?? `Server returned ${res.status}`);
+        throw new Error(body.error ?? fallbackError(res.status));
       }
 
       const data = (await res.json()) as AnalyzeResult;
