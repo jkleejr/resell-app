@@ -4,6 +4,8 @@
 // The backend is public, so anyone with the app URL can call /api/analyze and
 // spend our Anthropic credits. This module limits that:
 //   - per-device daily cap: one device gets at most DAILY_DEVICE_CAP scans/UTC-day (40)
+//   - per-device daily search allowance: at most SEARCH_DEVICE_CAP paid price
+//     checks/UTC-day (20) for that same device
 //   - all-time total counter: cumulative scans across everyone (for the stats UI)
 //   - optional global daily cap: at most GLOBAL_DAILY_CAP scans/UTC-day across ALL
 //     users — a circuit breaker on total daily spend. OFF unless the env var is set.
@@ -108,31 +110,48 @@ export async function checkAndRecordScan(
 // --- Price verification: budget + cache ----------------------------------
 //
 // The optional web-search pass (lib/verify.ts) costs about a cent each time it
-// runs. These two helpers are what bound that: a hard daily ceiling on the
-// number of searches, and a cache so the same item is never looked up twice in
+// runs. These two helpers are what bound that: a daily allowance each device
+// spends on its own, and a cache so the same item is never looked up twice in
 // a fortnight.
 
-const SEARCH_DAILY_CAP = Number(process.env.SEARCH_DAILY_CAP ?? 30);
+// Per device, per UTC day — the same shape as the scan cap above, and for the
+// same reason. A shared pool is a race: whoever scans first in the morning can
+// spend the whole app's search budget before anyone else opens the app, and
+// everyone after them silently gets an unverified price. An allowance the user
+// owns is spent only by them, and it can only run out through their own use.
+//
+// The trade is deliberate: this no longer bounds TOTAL daily search spend the
+// way a shared pool did. What bounds that now is GLOBAL_DAILY_CAP — a search
+// can never outnumber the scan that triggered it — plus the Anthropic monthly
+// spend limit behind everything.
+const SEARCH_DEVICE_CAP = Number(process.env.SEARCH_DEVICE_CAP ?? 20);
 
 // Resale prices move slowly; a fortnight-old comp is still a good comp, and
 // re-running the search would cost a cent to learn almost nothing.
 const VERIFY_CACHE_TTL_SECONDS = 1_209_600; // 14 days
 
 /**
- * Claim one search against today's global budget.
+ * Claim one search against this device's daily allowance.
  *
  * Note this FAILS CLOSED, the opposite of checkAndRecordScan above. That gate
  * fails open because a KV blip must never stop someone scanning — the scan is
- * the product. This one guards spending: if we can't confirm there's budget
+ * the product. This one guards spending: if we can't confirm there's allowance
  * left, we skip the search and serve the model's own estimate. The user still
  * gets a complete result, just an unverified one, so the cost of being wrong
  * here is a slightly less accurate price rather than a broken app.
+ *
+ * Callers with no device id (the CLI and curl paths) all share the "unknown"
+ * bucket, exactly as they do for the scan cap — so an anonymous caller can't
+ * mint itself a fresh allowance by simply omitting the header.
  */
-export async function claimSearchBudget(): Promise<boolean> {
+export async function claimSearchBudget(
+  deviceId: string | undefined,
+): Promise<boolean> {
   if (!configured()) return false;
 
   const day = utcDay();
-  const key = `search:day:${day}`;
+  const id = (deviceId ?? "").trim() || "unknown";
+  const key = `search:${id}:${day}`;
   const out = await pipeline([
     ["INCR", key],
     ["EXPIRE", key, KEY_TTL_SECONDS],
@@ -140,8 +159,8 @@ export async function claimSearchBudget(): Promise<boolean> {
   if (!out) return false;
 
   const used = resultInt(out[0]);
-  if (used > SEARCH_DAILY_CAP) {
-    console.log(`[verify] daily search budget spent (${SEARCH_DAILY_CAP})`);
+  if (used > SEARCH_DEVICE_CAP) {
+    console.log(`[verify] device search allowance spent (${SEARCH_DEVICE_CAP})`);
     return false;
   }
   return true;

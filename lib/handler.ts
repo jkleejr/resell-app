@@ -90,7 +90,7 @@ export async function handleAnalyzeRequest(
 
   try {
     const result = await analyzeImage(images, hint);
-    const priced = await maybeVerifyPrice(result);
+    const priced = await maybeVerifyPrice(result, ctx.deviceId);
     return { status: 200, body: priced as unknown as Record<string, unknown> };
   } catch (err) {
     console.error("[analyze] failed:", err);
@@ -162,7 +162,10 @@ function verifyCacheKey(r: AnalyzeResult): string {
   return createHash("sha1").update(identity).digest("hex").slice(0, 20);
 }
 
-async function maybeVerifyPrice(result: AnalyzeResult): Promise<AnalyzeResult> {
+async function maybeVerifyPrice(
+  result: AnalyzeResult,
+  deviceId?: string,
+): Promise<AnalyzeResult> {
   if (!shouldVerify(result)) return result;
 
   const key = verifyCacheKey(result);
@@ -176,9 +179,10 @@ async function maybeVerifyPrice(result: AnalyzeResult): Promise<AnalyzeResult> {
     return applyVerified(result, cached);
   }
 
-  // Only now do we spend. Fails closed: no budget, no search. No note either —
-  // nothing was attempted, so there is nothing to tell the seller about.
-  if (!(await claimSearchBudget())) return result;
+  // Only now do we spend, against this device's own daily allowance. Fails
+  // closed: no allowance, no search. No note either — nothing was attempted, so
+  // there is nothing to tell the seller about.
+  if (!(await claimSearchBudget(deviceId))) return result;
 
   const verified = await verifyPrice(result);
   if (!verified) {
