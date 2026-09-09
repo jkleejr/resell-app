@@ -1,4 +1,4 @@
-import { analyzeImage, type ImageInput } from "./analyze.js";
+import { analyzeImage, isTimeout, type ImageInput } from "./analyze.js";
 import { priceItem } from "./price.js";
 import { isValidMediaType, type AnalyzeResult } from "./schema.js";
 import {
@@ -94,6 +94,16 @@ export async function handleAnalyzeRequest(
     return { status: 200, body: priced as unknown as Record<string, unknown> };
   } catch (err) {
     console.error("[analyze] failed:", err);
+    // A timeout is worth its own message. "Analysis failed" reads like the
+    // photo was the problem and invites the user to take a better one; running
+    // out of time says nothing about their photo, and trying again is the right
+    // move rather than a wasted one.
+    if (isTimeout(err)) {
+      return {
+        status: 504,
+        body: { error: "That took longer than expected. Please try again." },
+      };
+    }
     return { status: 502, body: { error: "Analysis failed" } };
   }
 }

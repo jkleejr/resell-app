@@ -20,6 +20,27 @@ import { cleanText, completeSentences, dropHedges } from "./text.js";
 // photos — both support vision + structured outputs, so no other code changes.
 const MODEL = process.env.MODEL ?? "claude-sonnet-4-6";
 
+// Wall-clock ceiling on the vision call, and the last hole in the 30s limit.
+//
+// Everything else already fails on our own terms: verification is handed a
+// deadline, and every way it can fail returns the estimate. This call was the
+// exception — it had no timeout of its own, so a slow or degraded API could eat
+// the whole request and let Vercel kill the function, which returns a platform
+// 504 with an HTML body and no message the app can show.
+//
+// 20s is a little over three times the ~6s a scan actually takes. The number
+// also lines up with the rest: spend all of it and only 7s of the 30 remain,
+// which is below the 8s verification needs to be worth starting — so a slow
+// identification skips the price check and still returns a complete result,
+// rather than dragging the whole request past the limit.
+const TIMEOUT_MS = Number(process.env.ANALYZE_TIMEOUT_MS ?? 20_000);
+
+// No retries. The SDK defaults to two, and a retry costs a FULL timeout again —
+// 60s against a 30s limit, which is the failure this is meant to prevent. A
+// person tapping "Try again" on a result they can see is a better retry than
+// one that silently triples the wait and then fails anyway.
+const MAX_RETRIES = 0;
+
 // Headroom, not a budget. A normal scan spends ~200 output tokens, so this
 // never costs anything extra — but the schema has fifteen fields and the
 // description sits twelfth, which means a cap the model can actually reach gets
@@ -94,6 +115,20 @@ If the photo is blurry, dark, partial, or ambiguous: describe the item generical
 
 That degrading happens in the DATA fields — brand, specificity, priceConfidence, and the price range carry your uncertainty. The title and listingDescription stay clean either way: they get shorter and more general, never hedged. A seller must be able to post them without editing a word.`;
 
+/**
+ * Did this call run out of time, as opposed to failing some other way?
+ *
+ * Lives here so the handler can ask without importing the SDK, and so the one
+ * place that knows how the client is configured is the same place that knows
+ * what its failures look like.
+ */
+export function isTimeout(err: unknown): boolean {
+  return (
+    err instanceof Anthropic.APIConnectionTimeoutError ||
+    (err instanceof Error && err.name === "APIConnectionTimeoutError")
+  );
+}
+
 export interface ImageInput {
   /** base64-encoded image data, no `data:` prefix. */
   data: string;
@@ -105,7 +140,7 @@ export async function analyzeImage(
   hint?: string,
 ): Promise<AnalyzeResult> {
   // Reads ANTHROPIC_API_KEY from the environment.
-  const client = new Anthropic();
+  const client = new Anthropic({ timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
 
   const imageBlocks = images.map((img) => ({
     type: "image" as const,
