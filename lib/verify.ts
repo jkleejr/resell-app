@@ -4,6 +4,7 @@ import {
   VERIFY_SCHEMA,
   type AnalyzeResult,
   type VerifiedPrice,
+  type VerifyOutcome,
 } from "./schema.js";
 import { cleanText } from "./text.js";
 
@@ -162,7 +163,7 @@ function describeItem(r: AnalyzeResult): string {
 export async function verifyPrice(
   result: AnalyzeResult,
   budgetMs: number = TIMEOUT_MS,
-): Promise<VerifiedPrice | null> {
+): Promise<VerifyOutcome> {
   const isOriginal = result.valuationBasis === "original";
   const timeout = Math.min(TIMEOUT_MS, budgetMs);
 
@@ -202,8 +203,10 @@ export async function verifyPrice(
     // A long search can come back paused. We don't continue paused turns — the
     // whole point is to be fast and cheap — so treat it as "no answer".
     if (response.stop_reason === "pause_turn") {
+      // The search may well have run, but we never got a verdict, so we have
+      // nothing to report about what it found.
       console.log("[verify] paused turn, falling back to the estimate");
-      return null;
+      return NOT_SEARCHED;
     }
 
     const searches =
@@ -214,8 +217,9 @@ export async function verifyPrice(
     );
 
     // No search performed means the model answered from the same pretrained
-    // knowledge that produced the estimate. Nothing was verified.
-    if (searches === 0) return null;
+    // knowledge that produced the estimate. Nothing was verified, and nothing
+    // was looked for either.
+    if (searches === 0) return NOT_SEARCHED;
 
     // Unlike the single-shot analyze call, a search turn emits SEVERAL text
     // blocks: Claude's "I'll look this up" preamble, then commentary around the
@@ -226,19 +230,28 @@ export async function verifyPrice(
       const block = response.content[i];
       if (block?.type !== "text") continue;
       try {
-        return interpret(JSON.parse(block.text), result);
+        // A search ran and we can read its verdict. Whether that verdict is
+        // usable is interpret()'s call, but either way we can honestly say we
+        // looked.
+        return { price: interpret(JSON.parse(block.text), result), searched: true };
       } catch {
         continue;
       }
     }
+    // A search ran, but its answer is unreadable — so we do not know what it
+    // found and must not characterise it.
     console.log("[verify] no parseable JSON in response");
-    return null;
+    return NOT_SEARCHED;
   } catch (err) {
     // Includes timeouts and any 400 from an unsupported tool combination.
     console.warn("[verify] failed, keeping the estimate:", err);
-    return null;
+    return NOT_SEARCHED;
   }
 }
+
+// Nothing ran, or nothing came back we can speak to. The caller serves the
+// estimate with no note at all.
+const NOT_SEARCHED: VerifyOutcome = { price: null, searched: false };
 
 // Turn a raw verification response into a price we're willing to show — or null.
 function interpret(

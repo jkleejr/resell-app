@@ -180,18 +180,27 @@ async function maybeVerifyPrice(
   // nothing to tell the seller about.
   if (!(await claimSearchBudget(deviceId))) return result;
 
-  const verified = await verifyPrice(result, remainingMs);
-  if (!verified) {
-    // We searched and came back empty. Say so plainly and briefly: the scan
-    // just took ten seconds longer than usual and the seller deserves to know
-    // why, without a tour of which marketplaces were tried. WHICH site failed
-    // is our problem, not theirs — "no eBay results" invites them to wonder
-    // whether eBay is broken. priceBasis stays "estimate" because the number
-    // is still the model's own.
-    return { ...result, priceNote: "Couldn't find listings" };
+  const outcome = await verifyPrice(result, remainingMs);
+  if (!outcome.price) {
+    // Two different situations, and only one of them is ours to explain.
+    //
+    // A search that ran and came back empty earns a line: the scan just took
+    // ten seconds longer than usual and the seller deserves to know why,
+    // without a tour of which marketplaces were tried. WHICH site failed is our
+    // problem, not theirs — "no eBay results" invites them to wonder whether
+    // eBay is broken. priceBasis stays "estimate" because the number is still
+    // the model's own.
+    //
+    // A search that never ran — it timed out, threw, or was never issued —
+    // earns silence. "Couldn't find listings" would be the app describing an
+    // outcome it never reached, and the seller has no use for a report on a
+    // lookup that did not happen.
+    return outcome.searched
+      ? { ...result, priceNote: "Couldn't find listings" }
+      : result;
   }
 
-  return applyVerified(result, verified);
+  return applyVerified(result, outcome.price);
 }
 
 function applyVerified(

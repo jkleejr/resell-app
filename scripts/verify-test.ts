@@ -77,11 +77,16 @@ async function main(): Promise<void> {
     console.log(`   estimate: $${low}-${high}`);
 
     const started = Date.now();
-    const verified = await verifyPrice(item);
+    const outcome = await verifyPrice(item);
+    const verified = outcome.price;
     const elapsed = ((Date.now() - started) / 1000).toFixed(1);
 
     if (!verified) {
-      console.log(`   verified: (none — kept the estimate)   ${elapsed}s`);
+      // Say WHICH kind of nothing: a search that ran and found nothing usable
+      // is a different result from one that never ran, and only the first tells
+      // you anything about the market.
+      const why = outcome.searched ? "searched, nothing usable" : "no search ran";
+      console.log(`   verified: (none — ${why})   ${elapsed}s`);
       continue;
     }
     const shift = (

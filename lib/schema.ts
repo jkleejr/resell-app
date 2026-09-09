@@ -140,6 +140,23 @@ export interface VerifiedPrice {
   note: string;
 }
 
+/**
+ * What the verification pass actually did — not just what it produced.
+ *
+ * `price` being null is not one situation, it is two, and they owe the seller
+ * different things. A search that ran and came back with nothing usable is
+ * worth a line under the price, because it explains the extra ten seconds they
+ * just waited. A search that never ran — timed out, threw, paused, or was never
+ * issued — explains nothing, and saying "couldn't find listings" there is the
+ * app claiming an outcome it never reached.
+ */
+export interface VerifyOutcome {
+  /** The refined range, or null when nothing usable came back. */
+  price: VerifiedPrice | null;
+  /** True only when a search ran AND returned a verdict we could read. */
+  searched: boolean;
+}
+
 export const VERIFY_SCHEMA = {
   type: "object",
   additionalProperties: false,
