@@ -22,15 +22,23 @@ import { buildComparison, speedLabel, toPrice } from "./pricing";
 //
 // Measured against production: three plain scans ran 6.3s, 6.3s and 6.6s. The
 // verified path adds a web search and a second inference pass on top of that —
-// 8-15s by lib/verify.ts's own measurement, hard-capped by its 20s timeout.
+// 8-15s by lib/verify.ts's own measurement, capped at 20s but given only what
+// is left of the server's own 30s limit once the photo has been identified
+// (see maybeVerifyPrice). A slow identification therefore shortens the check
+// rather than pushing the total out, which is what keeps ~20s honest.
 const PLAIN_SCAN_SECONDS = 6;
 const VERIFIED_SCAN_SECONDS = 20;
 
 // The client is never told which path the server took: whether to run the price
 // check is decided AFTER the photo is identified, so it cannot be known when
-// the request goes out. Overrunning a plain scan is the only signal available,
-// and it is a reliable one — past this mark the extra time IS the price check.
+// the request goes out. Overrunning a plain scan is the only signal available.
 // Set clear of the slowest plain scan observed rather than on top of it.
+//
+// It is an inference, not a fact: a slow identification also overruns this
+// mark, and the screen will say "Checking recent listings" while the model is
+// still naming the item. Harmless — the wait is real either way, and the
+// alternative is a silent spinner for the one path that takes three times as
+// long.
 const SEARCH_TELL_SECONDS = 8;
 
 // Mirrors the backend /api/analyze contract (lib/schema.ts).
