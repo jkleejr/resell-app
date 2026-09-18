@@ -458,8 +458,16 @@ export default function App() {
                     behind it. The large middle — identified but in a market the
                     model admits it doesn't follow — stays silent on purpose,
                     the same way the price note does: a certainty claim we
-                    can't back is worth less than no claim. */}
-                {result.specificity === "generic" ? (
+                    can't back is worth less than no claim.
+
+                    A verified price outranks a generic match. Originals are
+                    always "generic" — a one-of-a-kind piece is never an exact
+                    product — and originals are the only items that get
+                    searched, so checking specificity first meant "very
+                    certain" could never appear, and a searched price sat
+                    under a "best guess" badge. */}
+                {result.priceBasis !== "verified" &&
+                result.specificity === "generic" ? (
                   <Badge label="best guess" tone="caution" />
                 ) : certainty ? (
                   <Badge label={certainty} tone="confident" />
