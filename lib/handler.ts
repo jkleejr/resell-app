@@ -89,7 +89,13 @@ export async function handleAnalyzeRequest(
   }
 
   try {
-    const result = await analyzeImage(images, hint);
+    // The vision pass (retry included) must finish inside the same deadline
+    // verification works to, leaving the margin for writing the response.
+    const result = await analyzeImage(
+      images,
+      hint,
+      startedAt + FUNCTION_BUDGET_MS - RESPONSE_MARGIN_MS,
+    );
     const priced = await maybeVerifyPrice(result, ctx.deviceId, startedAt);
     return { status: 200, body: priced as unknown as Record<string, unknown> };
   } catch (err) {
@@ -118,15 +124,21 @@ export async function handleAnalyzeRequest(
 // to refine a $30 estimate helps nobody.
 const VERIFY_MIN_USD = Number(process.env.VERIFY_MIN_USD ?? 40);
 
-// The function is killed at 30s (vercel.json maxDuration), and a killed
-// function returns a platform 504 with an HTML body — no JSON, no message the
-// app can show. Everything below therefore works to a DEADLINE rather than a
-// fixed budget: the vision pass spends what it spends, and verification gets
-// only what is left.
+// The request's own deadline: the longest anyone waits for a scan. Everything
+// works to it rather than to fixed budgets — the vision pass (and its one
+// retry, see analyzeImage) spends what it needs, and verification gets only
+// what is left.
 //
-// Without this the two simply add up and hope. A slow four-photo vision call
-// (8-12s) plus a full 20s verification is 28-32s, which straddles the limit.
-const FUNCTION_BUDGET_MS = 30_000;
+// Vercel kills the function at 60s (vercel.json maxDuration), deliberately
+// well past this. A killed function returns a platform 504 with an HTML body —
+// no JSON, no message the app can show — so the platform limit is only a
+// backstop for time spent before this clock starts (cold start, receiving
+// four photos), never the thing that ends a scan.
+//
+// 45s is set by the slow path: a stalled first vision attempt (20s) plus a
+// retry that gets the ~22s left. A normal scan is ~6s, or ~20s with the price
+// check, so nobody waits this long unless the API was stuck.
+const FUNCTION_BUDGET_MS = 45_000;
 
 // Held back so the result can be serialised and written after verification
 // returns. Small, but it is the difference between a complete response and no

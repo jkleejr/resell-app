@@ -3,7 +3,7 @@
   "cleanUrls": true,
   "functions": {
     "api/analyze.ts": {
-      "maxDuration": 30
+      "maxDuration": 60
     }
   }
 }

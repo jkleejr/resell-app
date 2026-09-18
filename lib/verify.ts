@@ -29,7 +29,7 @@ const MODEL = process.env.VERIFY_MODEL ?? "claude-sonnet-4-6";
 // unverified one.
 //
 // This is a CEILING, not the budget actually used. The caller knows how much of
-// the function's own 30s limit the vision pass already spent, and passes in
+// the request's own 45s deadline the vision pass already spent, and passes in
 // whatever is left; this value only caps that. See maybeVerifyPrice().
 //
 // Measured: a search plus both inference passes takes 8-15s. The first budget

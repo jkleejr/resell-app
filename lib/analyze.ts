@@ -20,25 +20,26 @@ import { cleanText, completeSentences, dropHedges } from "./text.js";
 // photos — both support vision + structured outputs, so no other code changes.
 const MODEL = process.env.MODEL ?? "claude-sonnet-4-6";
 
-// Wall-clock ceiling on the vision call, and the last hole in the 30s limit.
+// Wall-clock ceiling on the FIRST vision attempt.
 //
-// Everything else already fails on our own terms: verification is handed a
-// deadline, and every way it can fail returns the estimate. This call was the
-// exception — it had no timeout of its own, so a slow or degraded API could eat
-// the whole request and let Vercel kill the function, which returns a platform
-// 504 with an HTML body and no message the app can show.
+// The vision call is the one step with no fallback: verification can fail and
+// still leave the estimate, but a failed identification leaves nothing to show.
+// So a stalled first attempt gets one more try rather than an error screen. A
+// slow call is usually one stuck request, and a fresh one comes back in the
+// normal ~6s far more often than the stuck one finishes.
 //
-// 20s is a little over three times the ~6s a scan actually takes. The number
-// also lines up with the rest: spend all of it and only 7s of the 30 remain,
-// which is below the 8s verification needs to be worth starting — so a slow
-// identification skips the price check and still returns a complete result,
-// rather than dragging the whole request past the limit.
-const TIMEOUT_MS = Number(process.env.ANALYZE_TIMEOUT_MS ?? 20_000);
+// 20s is a little over three times the ~6s a scan actually takes, and it leaves
+// ~22s of the request's 45s deadline for the retry.
+const FIRST_ATTEMPT_MS = Number(process.env.ANALYZE_TIMEOUT_MS ?? 20_000);
 
-// No retries. The SDK defaults to two, and a retry costs a FULL timeout again —
-// 60s against a 30s limit, which is the failure this is meant to prevent. A
-// person tapping "Try again" on a result they can see is a better retry than
-// one that silently triples the wait and then fails anyway.
+// Not worth starting a retry with less than this left — it would time out
+// before a normal scan could finish, and the user would wait longer for the
+// same error.
+const MIN_RETRY_MS = 8_000;
+
+// The SDK's own retries stay off. It defaults to two, each costing a full
+// timeout and none of them aware of the request's deadline. The one retry lives
+// in analyzeImage(), where it can be sized to whatever time is actually left.
 const MAX_RETRIES = 0;
 
 // Headroom, not a budget. A normal scan spends ~200 output tokens, so this
@@ -135,13 +136,30 @@ export interface ImageInput {
   mediaType: MediaType;
 }
 
+/**
+ * Is this failure the API's rather than the request's — worth one more try?
+ *
+ * Timeouts, dropped connections, 529 overloaded and other 5xx are about the
+ * API's state at that moment, and a fresh request can land somewhere healthy.
+ * A 4xx is about what we sent, and sending it again gets the same answer.
+ */
+function isRetryable(err: unknown): boolean {
+  if (isTimeout(err)) return true;
+  if (err instanceof Anthropic.APIConnectionError) return true;
+  return (
+    err instanceof Anthropic.APIError &&
+    typeof err.status === "number" &&
+    err.status >= 500
+  );
+}
+
 export async function analyzeImage(
   images: ImageInput[],
   hint?: string,
+  // Epoch ms by which the vision pass must be done, retry included. The
+  // handler derives it from the request's own deadline.
+  deadline: number = Date.now() + FIRST_ATTEMPT_MS,
 ): Promise<AnalyzeResult> {
-  // Reads ANTHROPIC_API_KEY from the environment.
-  const client = new Anthropic({ timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
-
   const imageBlocks = images.map((img) => ({
     type: "image" as const,
     source: {
@@ -164,24 +182,46 @@ export async function analyzeImage(
   // Structured outputs constrain the response to ANALYZE_SCHEMA on the normal
   // text channel — cleaner than forced tool use, which can leak tool-call
   // formatting tokens into string fields on degenerate inputs.
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: MAX_OUTPUT_TOKENS,
-    thinking: { type: "disabled" },
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: [...imageBlocks, { type: "text", text }],
+  const attempt = (timeout: number) =>
+    // Reads ANTHROPIC_API_KEY from the environment.
+    new Anthropic({ timeout, maxRetries: MAX_RETRIES }).messages.create({
+      model: MODEL,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      thinking: { type: "disabled" },
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: [...imageBlocks, { type: "text", text }],
+        },
+      ],
+      output_config: {
+        format: {
+          type: "json_schema",
+          schema: ANALYZE_SCHEMA as unknown as Record<string, unknown>,
+        },
       },
-    ],
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: ANALYZE_SCHEMA as unknown as Record<string, unknown>,
-      },
-    },
-  });
+    });
+
+  // One try, and one more only if the failure was the API's and there is time
+  // for a normal scan to finish. Otherwise the error goes up to the handler,
+  // which turns a timeout into "That took longer than expected".
+  let response;
+  try {
+    response = await attempt(
+      Math.min(FIRST_ATTEMPT_MS, Math.max(deadline - Date.now(), 1)),
+    );
+  } catch (err) {
+    const left = deadline - Date.now();
+    if (!isRetryable(err) || left < MIN_RETRY_MS) throw err;
+    const reason = isTimeout(err)
+      ? "timeout"
+      : err instanceof Anthropic.APIError && err.status
+        ? `status ${err.status}`
+        : "connection error";
+    console.log(`[analyze] retrying after ${reason}, ${left}ms left`);
+    response = await attempt(left);
+  }
 
   // Per-scan usage + cost, so the model A/B test shows real numbers (not
   // estimates) next to the result quality.

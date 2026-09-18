@@ -23,23 +23,31 @@ import { buildComparison, speedLabel, toPrice } from "./pricing";
 // Measured against production: three plain scans ran 6.3s, 6.3s and 6.6s. The
 // verified path adds a web search and a second inference pass on top of that —
 // 8-15s by lib/verify.ts's own measurement, capped at 20s but given only what
-// is left of the server's own 30s limit once the photo has been identified
-// (see maybeVerifyPrice). A slow identification therefore shortens the check
-// rather than pushing the total out, which is what keeps ~20s honest.
+// is left of the server's own 45s deadline once the photo has been identified
+// (see maybeVerifyPrice). Past ~20s it is either a price check at the slow end
+// of its range or a vision call the server is retrying after the first attempt
+// stalled — both rare, and neither gets a number of its own (LONG_WAIT_NOTE).
 const PLAIN_SCAN_SECONDS = 6;
 const VERIFIED_SCAN_SECONDS = 20;
 
 // The client is never told which path the server took: whether to run the price
 // check is decided AFTER the photo is identified, so it cannot be known when
 // the request goes out. Overrunning a plain scan is the only signal available.
-// Set clear of the slowest plain scan observed rather than on top of it.
+// Set clear of the slowest plain scan rather than on top of it: at 8s, plain
+// scans that ran 7-9s (several photos, a busy API) flipped to "~20 seconds"
+// and then finished a moment later, which read as the estimate being wrong.
 //
 // It is an inference, not a fact: a slow identification also overruns this
 // mark, and the screen will say "Checking recent listings" while the model is
 // still naming the item. Harmless — the wait is real either way, and the
 // alternative is a silent spinner for the one path that takes three times as
 // long.
-const SEARCH_TELL_SECONDS = 8;
+const SEARCH_TELL_SECONDS = 10;
+
+// Shown once even the longer estimate has been used up. Not a number: an
+// estimate already blown past reads as stuck rather than slow, but a silent
+// spinner at 25s reads the same way. Saying it is unusual is the honest part.
+const LONG_WAIT_NOTE = "Taking longer than usual…";
 
 // Mirrors the backend /api/analyze contract (lib/schema.ts).
 type AnalyzeResult = {
@@ -290,7 +298,7 @@ export default function App() {
     ? `~${PLAIN_SCAN_SECONDS} seconds`
     : elapsed <= VERIFIED_SCAN_SECONDS
       ? `~${VERIFIED_SCAN_SECONDS} seconds`
-      : null;
+      : LONG_WAIT_NOTE;
 
   // How sure the app is, in two words, or nothing at all.
   //
@@ -389,12 +397,10 @@ export default function App() {
               <Text style={styles.muted}>
                 {searching ? "Checking recent listings…" : "Identifying…"}
               </Text>
-              {/* Drops away once the longer estimate is spent too. A number
-                  already blown past is worse than no number — it reads as the
-                  app being stuck rather than being slow. */}
-              {waitEstimate ? (
-                <Text style={styles.waitNote}>{waitEstimate}</Text>
-              ) : null}
+              {/* Becomes LONG_WAIT_NOTE once the longer estimate is spent too.
+                  A number already blown past is worse than no number — it
+                  reads as the app being stuck rather than being slow. */}
+              <Text style={styles.waitNote}>{waitEstimate}</Text>
             </View>
           </>
         )}
