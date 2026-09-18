@@ -24,11 +24,13 @@ import { buildComparison, speedLabel, toPrice } from "./pricing";
 // verified path adds a web search and a second inference pass on top of that —
 // 8-15s by lib/verify.ts's own measurement, capped at 20s but given only what
 // is left of the server's own 45s deadline once the photo has been identified
-// (see maybeVerifyPrice). Past ~20s it is either a price check at the slow end
-// of its range or a vision call the server is retrying after the first attempt
+// (see maybeVerifyPrice). That arithmetic said ~20s, but a real verified scan
+// against production (a handmade vase, 2026-09-18) took 26.6s end to end, so
+// the estimate is 25s. Past that it is either a price check at the slow end of
+// its range or a vision call the server is retrying after the first attempt
 // stalled — both rare, and neither gets a number of its own (LONG_WAIT_NOTE).
 const PLAIN_SCAN_SECONDS = 6;
-const VERIFIED_SCAN_SECONDS = 20;
+const VERIFIED_SCAN_SECONDS = 25;
 
 // The client is never told which path the server took: whether to run the price
 // check is decided AFTER the photo is identified, so it cannot be known when
@@ -46,7 +48,7 @@ const SEARCH_TELL_SECONDS = 10;
 
 // Shown once even the longer estimate has been used up. Not a number: an
 // estimate already blown past reads as stuck rather than slow, but a silent
-// spinner at 25s reads the same way. Saying it is unusual is the honest part.
+// spinner at 30s reads the same way. Saying it is unusual is the honest part.
 const LONG_WAIT_NOTE = "Taking longer than usual…";
 
 // Mirrors the backend /api/analyze contract (lib/schema.ts).
