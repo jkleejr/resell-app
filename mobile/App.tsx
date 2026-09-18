@@ -321,6 +321,27 @@ export default function App() {
       ? buildComparison(price.median, result.recommendedPlatform)
       : null;
 
+  // The photos behind the current scan: the first one large, then a row of
+  // every photo when there are several. Shared by the result and error screens.
+  const scannedPhotos = (
+    <>
+      {images[0] && (
+        <Image source={{ uri: images[0].uri }} style={styles.preview} />
+      )}
+      {images.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.thumbRow}
+        >
+          {images.map((img) => (
+            <Image key={img.uri} source={{ uri: img.uri }} style={styles.thumb} />
+          ))}
+        </ScrollView>
+      )}
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
@@ -406,32 +427,20 @@ export default function App() {
         )}
 
         {status === "error" && error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
+          <>
+            {/* The photos "Try again" will re-send, so the user can see what
+                they are retrying — or that it is worth starting over. */}
+            {scannedPhotos}
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          </>
         )}
 
         {status === "done" && result && (
           <>
             {/* The scanned photo(s), shown above the result */}
-            {images[0] && (
-              <Image source={{ uri: images[0].uri }} style={styles.preview} />
-            )}
-            {images.length > 1 && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.thumbRow}
-              >
-                {images.map((img) => (
-                  <Image
-                    key={img.uri}
-                    source={{ uri: img.uri }}
-                    style={styles.thumb}
-                  />
-                ))}
-              </ScrollView>
-            )}
+            {scannedPhotos}
 
             {/* Item */}
             <View style={styles.card}>
