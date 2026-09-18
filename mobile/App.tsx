@@ -481,8 +481,12 @@ export default function App() {
               )}
             </View>
 
-            {/* Reshoot nudge when the match is only generic */}
-            {result.specificity === "generic" && (
+            {/* Reshoot nudge when the match is only generic. Not for
+                originals: they are always "generic" because a one-of-a-kind
+                piece is never an exact product, and asking its maker for a
+                brand logo or label to photograph asks for something that
+                does not exist. */}
+            {result.specificity === "generic" && !isOriginal && (
               <View style={styles.nudge}>
                 <Text style={styles.nudgeTitle}>Not sure of the exact product</Text>
                 <Text style={styles.nudgeBody}>
