@@ -9,3 +9,18 @@ Take a picture of an item, find its worth, and where to resell.
 <img width="603" height="1311" alt="IMG_6200" src="https://github.com/user-attachments/assets/622ee9b5-c86c-4e5b-b9a6-d46b70388471" />
 
 <img width="603" height="1311" alt="IMG_6201" src="https://github.com/user-attachments/assets/6bc66fdb-834c-475c-9dcd-fc8f6b951614" />
+
+## Usage report
+
+Every scan leaves one small anonymous record in Upstash (`lib/scanlog.ts` — no
+device id, photos, hint text, or item title/brand). To see how the app is being
+used:
+
+```
+npm run report                # everything recorded so far
+npm run report -- --days 7    # only the last 7 days
+npm run report -- --json      # raw numbers
+```
+
+Needs the production `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` in
+`.env`. `npm test` runs the backend tests (no API calls, no cost).

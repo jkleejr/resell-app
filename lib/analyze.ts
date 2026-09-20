@@ -56,6 +56,31 @@ const PRICING: Record<string, { input: number; output: number }> = {
   "claude-haiku-4-5": { input: 1, output: 5 },
 };
 
+// What a call cost in tokens, or undefined for a model we have no prices for.
+export function tokenCostUSD(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+): number | undefined {
+  const price = PRICING[model];
+  return price
+    ? (inputTokens * price.input + outputTokens * price.output) / 1_000_000
+    : undefined;
+}
+
+/**
+ * What the vision pass did, as opposed to what it found — filled in for the
+ * scan log (lib/scanlog.ts). Passed in rather than returned so it survives a
+ * throw: a scan that failed after a retry still has a retry worth recording.
+ */
+export interface AnalyzeTrace {
+  model?: string;
+  retried?: boolean;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUSD?: number;
+}
+
 const SYSTEM_PROMPT = `You are an expert reseller's assistant. You are shown one or more photos of a SINGLE physical item the user wants to sell. When there are multiple photos they show the same item — different angles, or a close-up of a label, tag, or logo. Use every photo together to identify it. Identify the item and produce a structured listing summary.
 
 Most items you see are mass-produced goods being resold secondhand, and that is the default assumption. But not everything is: some items are one-of-a-kind pieces made by the person photographing them. Those have no secondhand market to discount from, so they are valued differently. The valuationBasis field below is where you make that call.
@@ -159,7 +184,10 @@ export async function analyzeImage(
   // Epoch ms by which the vision pass must be done, retry included. The
   // handler derives it from the request's own deadline.
   deadline: number = Date.now() + FIRST_ATTEMPT_MS,
+  trace: AnalyzeTrace = {},
 ): Promise<AnalyzeResult> {
+  trace.model = MODEL;
+  trace.retried = false;
   const imageBlocks = images.map((img) => ({
     type: "image" as const,
     source: {
@@ -220,16 +248,17 @@ export async function analyzeImage(
         ? `status ${err.status}`
         : "connection error";
     console.log(`[analyze] retrying after ${reason}, ${left}ms left`);
+    trace.retried = true;
     response = await attempt(left);
   }
 
   // Per-scan usage + cost, so the model A/B test shows real numbers (not
   // estimates) next to the result quality.
   const u = response.usage;
-  const price = PRICING[MODEL];
-  const cost = price
-    ? (u.input_tokens * price.input + u.output_tokens * price.output) / 1_000_000
-    : undefined;
+  const cost = tokenCostUSD(MODEL, u.input_tokens, u.output_tokens);
+  trace.inputTokens = u.input_tokens;
+  trace.outputTokens = u.output_tokens;
+  trace.costUSD = cost;
   console.log(
     `[analyze] model=${MODEL} in=${u.input_tokens} out=${u.output_tokens}` +
       (cost !== undefined ? ` cost=$${cost.toFixed(4)}` : ""),

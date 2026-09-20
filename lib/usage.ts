@@ -30,19 +30,25 @@ export interface ScanGate {
   /** Set when blocked, so the caller can return a helpful message. */
   reason?: "device" | "global";
   limit?: number;
+  /** Which scan of the UTC day this was for the device: 1 for its first, and
+   *  so on. A count, not an identity — the scan log keeps it so usage depth is
+   *  visible without the log ever holding a device. Unset if the KV is down. */
+  scanOfDay?: number;
 }
 
 function utcDay(): string {
   return new Date().toISOString().slice(0, 10).replace(/-/g, ""); // e.g. 20260624
 }
 
-function configured(): boolean {
+export function configured(): boolean {
   return Boolean(REST_URL && REST_TOKEN);
 }
 
 // Run an Upstash REST pipeline; returns the results array, or null on any error.
-async function pipeline(
+// `timeoutMs` is for callers that would rather give up than wait (the scan log).
+export async function pipeline(
   commands: (string | number)[][],
+  timeoutMs?: number,
 ): Promise<unknown[] | null> {
   try {
     const res = await fetch(`${REST_URL}/pipeline`, {
@@ -52,6 +58,7 @@ async function pipeline(
         "content-type": "application/json",
       },
       body: JSON.stringify(commands),
+      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
     });
     if (!res.ok) throw new Error(`Upstash responded ${res.status}`);
     return (await res.json()) as unknown[];
@@ -92,19 +99,29 @@ export async function checkAndRecordScan(
 
   const deviceUsed = resultInt(out[0]);
   if (deviceUsed > DEVICE_CAP) {
-    return { allowed: false, reason: "device", limit: DEVICE_CAP };
+    return {
+      allowed: false,
+      reason: "device",
+      limit: DEVICE_CAP,
+      scanOfDay: deviceUsed,
+    };
   }
   if (GLOBAL_DAILY_CAP !== null) {
     const globalUsed = resultInt(out[2]);
     if (globalUsed > GLOBAL_DAILY_CAP) {
-      return { allowed: false, reason: "global", limit: GLOBAL_DAILY_CAP };
+      return {
+        allowed: false,
+        reason: "global",
+        limit: GLOBAL_DAILY_CAP,
+        scanOfDay: deviceUsed,
+      };
     }
   }
 
   // Allowed → bump the all-time total. Counted only for scans we actually run,
   // so the counter reflects real (paid) scans, not blocked attempts.
   await pipeline([["INCR", "scans:total"]]);
-  return { allowed: true };
+  return { allowed: true, scanOfDay: deviceUsed };
 }
 
 // --- Price verification: the search allowance -----------------------------

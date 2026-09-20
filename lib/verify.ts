@@ -6,6 +6,7 @@ import {
   type VerifiedPrice,
   type VerifyOutcome,
 } from "./schema.js";
+import { tokenCostUSD } from "./analyze.js";
 import { cleanText } from "./text.js";
 
 // The optional second pass: one web search to sanity-check the model's own
@@ -46,6 +47,9 @@ const TIMEOUT_MS = Number(process.env.VERIFY_TIMEOUT_MS ?? 20_000);
 // shipping. Start with the combination we can reason about; the token savings
 // are the obvious next optimization if this proves useful.
 const SEARCH_TOOL_VERSION = "web_search_20250305";
+
+// What Anthropic bills per web search ($10 per 1,000), on top of the tokens.
+const SEARCH_COST_USD = 0.01;
 
 // Where each kind of item is actually priced. This is quality control, not cost
 // control: an unrestricted search surfaces retail and manufacturer pages, and
@@ -200,17 +204,27 @@ export async function verifyPrice(
       },
     });
 
+    // What the call cost whatever came of it — it is billed either way, and the
+    // search results it read are most of the bill. For the scan log.
+    const searches =
+      response.usage.server_tool_use?.web_search_requests ?? 0;
+    const costUSD =
+      (tokenCostUSD(
+        MODEL,
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+      ) ?? 0) +
+      searches * SEARCH_COST_USD;
+
     // A long search can come back paused. We don't continue paused turns — the
     // whole point is to be fast and cheap — so treat it as "no answer".
     if (response.stop_reason === "pause_turn") {
       // The search may well have run, but we never got a verdict, so we have
       // nothing to report about what it found.
       console.log("[verify] paused turn, falling back to the estimate");
-      return NOT_SEARCHED;
+      return { ...NOT_SEARCHED, costUSD };
     }
 
-    const searches =
-      response.usage.server_tool_use?.web_search_requests ?? 0;
     console.log(
       `[verify] basis=${result.valuationBasis} searches=${searches}` +
         ` in=${response.usage.input_tokens} out=${response.usage.output_tokens}`,
@@ -219,7 +233,7 @@ export async function verifyPrice(
     // No search performed means the model answered from the same pretrained
     // knowledge that produced the estimate. Nothing was verified, and nothing
     // was looked for either.
-    if (searches === 0) return NOT_SEARCHED;
+    if (searches === 0) return { ...NOT_SEARCHED, costUSD };
 
     // Unlike the single-shot analyze call, a search turn emits SEVERAL text
     // blocks: Claude's "I'll look this up" preamble, then commentary around the
@@ -233,7 +247,11 @@ export async function verifyPrice(
         // A search ran and we can read its verdict. Whether that verdict is
         // usable is interpret()'s call, but either way we can honestly say we
         // looked.
-        return { price: interpret(JSON.parse(block.text), result), searched: true };
+        return {
+          price: interpret(JSON.parse(block.text), result),
+          searched: true,
+          costUSD,
+        };
       } catch {
         continue;
       }
@@ -241,7 +259,7 @@ export async function verifyPrice(
     // A search ran, but its answer is unreadable — so we do not know what it
     // found and must not characterise it.
     console.log("[verify] no parseable JSON in response");
-    return NOT_SEARCHED;
+    return { ...NOT_SEARCHED, costUSD };
   } catch (err) {
     // Includes timeouts and any 400 from an unsupported tool combination.
     console.warn("[verify] failed, keeping the estimate:", err);

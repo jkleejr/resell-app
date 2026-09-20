@@ -8,7 +8,9 @@
     "dev": "node --env-file-if-exists=.env --import tsx scripts/dev-server.ts",
     "analyze": "node --env-file-if-exists=.env --import tsx scripts/test-analyze.ts",
     "verify-test": "node --env-file-if-exists=.env --import tsx scripts/verify-test.ts",
+    "report": "node --env-file-if-exists=.env --import tsx scripts/scan-report.ts",
     "icon": "node --import tsx scripts/make-icon.ts",
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

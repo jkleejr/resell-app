@@ -1,5 +1,16 @@
-import { analyzeImage, isTimeout, type ImageInput } from "./analyze.js";
+import {
+  analyzeImage,
+  isTimeout,
+  type AnalyzeTrace,
+  type ImageInput,
+} from "./analyze.js";
 import { priceItem } from "./price.js";
+import {
+  itemFacts,
+  recordScan,
+  type ScanEvent,
+  type VerifyStatus,
+} from "./scanlog.js";
 import { isValidMediaType, type AnalyzeResult } from "./schema.js";
 import {
   checkAndRecordScan,
@@ -80,7 +91,21 @@ export async function handleAnalyzeRequest(
   // Cost guard: per-device daily cap (+ optional global daily cap). Also bumps
   // the all-time scan counter. Fail-open if the KV store isn't configured.
   const gate = await checkAndRecordScan(ctx.deviceId);
+
+  // From here on this is a scan, and however it ends it leaves one anonymous
+  // record behind (lib/scanlog.ts). Requests rejected above were never scans.
+  // Note what is NOT carried forward: the device id, the photos, the hint text.
+  const logScan = (event: Omit<ScanEvent, "ts" | "totalMs" | "photos" | "hint">) =>
+    recordScan({
+      ...event,
+      totalMs: Date.now() - startedAt,
+      photos: images.length,
+      hint: Boolean(hint?.trim()),
+      scanOfDay: gate.scanOfDay,
+    });
+
   if (!gate.allowed) {
+    await logScan({ outcome: "capped" });
     const error =
       gate.reason === "global"
         ? "We've hit today's scan limit across all users. Please try again tomorrow."
@@ -88,6 +113,8 @@ export async function handleAnalyzeRequest(
     return { status: 429, body: { error } };
   }
 
+  const trace: AnalyzeTrace = {};
+  const visionStartedAt = Date.now();
   try {
     // The vision pass (retry included) must finish inside the same deadline
     // verification works to, leaving the margin for writing the response.
@@ -95,11 +122,34 @@ export async function handleAnalyzeRequest(
       images,
       hint,
       startedAt + FUNCTION_BUDGET_MS - RESPONSE_MARGIN_MS,
+      trace,
     );
-    const priced = await maybeVerifyPrice(result, ctx.deviceId, startedAt);
+    const visionMs = Date.now() - visionStartedAt;
+    const checked = await maybeVerifyPrice(result, ctx.deviceId, startedAt);
+    const priced = checked.result;
+    const verified = priced.priceBasis === "verified";
+    await logScan({
+      outcome: "ok",
+      visionMs,
+      ...trace,
+      // Four decimals is a hundredth of a cent — and keeps float noise out.
+      costUSD: roundTo4((trace.costUSD ?? 0) + (checked.costUSD ?? 0)),
+      // The model's OWN estimate, from before verification could replace it, so
+      // the log can show how far a search moved the price.
+      ...itemFacts(result),
+      verify: checked.status,
+      verifyMs: checked.ms,
+      verifiedLow: verified ? priced.estimatedValueUSD.low : undefined,
+      verifiedHigh: verified ? priced.estimatedValueUSD.high : undefined,
+    });
     return { status: 200, body: priced as unknown as Record<string, unknown> };
   } catch (err) {
     console.error("[analyze] failed:", err);
+    await logScan({
+      outcome: isTimeout(err) ? "timeout" : "error",
+      visionMs: Date.now() - visionStartedAt,
+      ...trace,
+    });
     // A timeout is worth its own message. "Analysis failed" reads like the
     // photo was the problem and invites the user to take a better one; running
     // out of time says nothing about their photo, and trying again is the right
@@ -181,12 +231,25 @@ function shouldVerify(r: AnalyzeResult): boolean {
   return r.valuationBasis === "original";
 }
 
+// The result to serve, plus — for the scan log — what became of the check.
+interface PriceCheck {
+  result: AnalyzeResult;
+  status: VerifyStatus;
+  /** Time and money the check took. Unset when it was never attempted. */
+  ms?: number;
+  costUSD?: number;
+}
+
+function roundTo4(n: number): number {
+  return Math.round(n * 10_000) / 10_000;
+}
+
 async function maybeVerifyPrice(
   result: AnalyzeResult,
   deviceId?: string,
   startedAt: number = Date.now(),
-): Promise<AnalyzeResult> {
-  if (!shouldVerify(result)) return result;
+): Promise<PriceCheck> {
+  if (!shouldVerify(result)) return { result, status: "not_eligible" };
 
   // What is left of the function's own lifetime. Checked BEFORE the allowance
   // is claimed, so a search we have no time to finish never costs anyone one.
@@ -194,15 +257,19 @@ async function maybeVerifyPrice(
     FUNCTION_BUDGET_MS - (Date.now() - startedAt) - RESPONSE_MARGIN_MS;
   if (remainingMs < MIN_VERIFY_MS) {
     console.log(`[verify] skipped: only ${remainingMs}ms left of the request`);
-    return result;
+    return { result, status: "no_time" };
   }
 
   // Spend against this device's own daily allowance. Fails closed: no
   // allowance, no search. No note either — nothing was attempted, so there is
   // nothing to tell the seller about.
-  if (!(await claimSearchBudget(deviceId))) return result;
+  if (!(await claimSearchBudget(deviceId))) {
+    return { result, status: "no_allowance" };
+  }
 
+  const verifyStartedAt = Date.now();
   const outcome = await verifyPrice(result, remainingMs);
+  const spent = { ms: Date.now() - verifyStartedAt, costUSD: outcome.costUSD };
   if (!outcome.price) {
     // Two different situations, and only one of them is ours to explain.
     //
@@ -218,11 +285,19 @@ async function maybeVerifyPrice(
     // outcome it never reached, and the seller has no use for a report on a
     // lookup that did not happen.
     return outcome.searched
-      ? { ...result, priceNote: "Couldn't find listings" }
-      : result;
+      ? {
+          result: { ...result, priceNote: "Couldn't find listings" },
+          status: "no_listings",
+          ...spent,
+        }
+      : { result, status: "not_searched", ...spent };
   }
 
-  return applyVerified(result, outcome.price);
+  return {
+    result: applyVerified(result, outcome.price),
+    status: "verified",
+    ...spent,
+  };
 }
 
 function applyVerified(

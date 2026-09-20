@@ -155,6 +155,8 @@ export interface VerifyOutcome {
   price: VerifiedPrice | null;
   /** True only when a search ran AND returned a verdict we could read. */
   searched: boolean;
+  /** What the call cost, tokens plus the search. Unset if it never returned. */
+  costUSD?: number;
 }
 
 export const VERIFY_SCHEMA = {
