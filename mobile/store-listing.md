@@ -29,6 +29,7 @@ Required for every update; it's the one listing field a new version forces you t
 ```
 - Photos stay on screen if a scan fails
 - More accurate wait time estimates
+- Updated app icon
 ```
 
 > Kept short and casual to match the notes live on the App Store. The rating
@@ -38,7 +39,8 @@ Required for every update; it's the one listing field a new version forces you t
 
 - **1.0.4** — asks for an App Store rating (Apple's native sheet) after the
   10th successful scan, then at most once per 30 days. Also: the scanned photos
-  stay above a failed scan's error, and the verified-scan wait estimate is ~25s.
+  stay above a failed scan's error, the verified-scan wait estimate is ~25s,
+  and a revised icon (larger tag).
   Notes as pasted: see the block above.
 - **1.0.3** — released 4 Sep 2026. Notes as live on the App Store:
   "Improved listing descriptions - Added high confidence labels - Added web
