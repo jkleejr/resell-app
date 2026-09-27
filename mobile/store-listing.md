@@ -1,9 +1,8 @@
 # App Store listing — Loot Check
 
 Copy each field into the matching App Store Connect field.
-Current submission: **1.0.3** (build auto-increments remotely; 1.0.2 was built 29 Aug 2026 —
-confirm it has finished review before submitting this one, since App Store Connect will
-not accept a new version while another is still in review).
+Current submission: **1.0.4** (build auto-increments remotely; 1.0.3 went live 4 Sep 2026.
+App Store Connect will not accept a new version while another is still in review).
 
 ## App Name (max 30)
 Loot Check
@@ -28,24 +27,22 @@ Paste into App Store Connect → the new version's **What's New in This Version*
 Required for every update; it's the one listing field a new version forces you to fill in.
 
 ```
-• Listings no longer arrive cut off — titles name the item itself, and descriptions always finish their last sentence
-• New badges show when a result is "pretty certain" or "very certain", not just when it's a best guess
-• Descriptions stick to plain facts about the item, with no hedging or filler
-• The scan screen now tells you roughly how long the wait will be
-• Handmade and original items are now priced as one-of-a-kind pieces rather than secondhand goods
-• Some prices now show what they're based on
-• A clearer message when you reach the daily scan limit
+- Photos stay on screen if a scan fails
+- More accurate wait time estimates
 ```
 
-> The last three bullets were written for the 1.0.3 build already uploaded (build 9,
-> 31 Aug); the first four cover the listing-quality work that landed after it. Keep all
-> seven **only while 1.0.3 is unreleased** — the field has to cover everything since
-> 1.0.2. If 1.0.3 has already gone live, a second binary needs `expo.version` bumped to
-> 1.0.4 and the note cut back to the first four bullets, since the other three shipped.
+> Kept short and casual to match the notes live on the App Store. The rating
+> prompt added in this version is deliberately not mentioned.
 
 ### Release-note history
 
-- **1.0.3** — original/handmade valuation surfaced in the UI: originals show
+- **1.0.4** — asks for an App Store rating (Apple's native sheet) after the
+  10th successful scan, then at most once per 30 days. Also: the scanned photos
+  stay above a failed scan's error, and the verified-scan wait estimate is ~25s.
+  Notes as pasted: see the block above.
+- **1.0.3** — released 4 Sep 2026. Notes as live on the App Store:
+  "Improved listing descriptions - Added high confidence labels - Added web
+  searches - Displays wait time estimates". Detail: original/handmade valuation surfaced in the UI: originals show
   "Estimated value" rather than a resale price, prices can carry a provenance
   line, and hitting the daily cap now actually stops further scans instead of
   offering a retry that cannot succeed. The valuation itself shipped earlier via
@@ -114,10 +111,10 @@ Free to use. No ads, no account required. Find out what your stuff is worth with
 Most listing metadata carries over from the last version untouched. These are the
 things a new version actually makes you handle:
 
-- [ ] **Version string** — `mobile/app.json` → `expo.version` is `1.0.3`. The build
+- [ ] **Version string** — `mobile/app.json` → `expo.version` is `1.0.4`. The build
       number is managed remotely (`appVersionSource: "remote"` in `eas.json`) and
       `autoIncrement` bumps it on the next production build. Don't set it by hand.
-- [ ] **1.0.2 out of review** — App Store Connect will not accept 1.0.3 while 1.0.2
+- [ ] **Previous version out of review** — App Store Connect will not accept 1.0.4 while 1.0.3
       is still `Waiting for Review` or `In Review`. Check before submitting.
 - [ ] **New build** — this build changes JS only, so an OTA update could in principle
       carry it. Ship it as a real build anyway: OTA channels are keyed to the app
