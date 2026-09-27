@@ -16,6 +16,7 @@ import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as Clipboard from "expo-clipboard";
 import { BACKEND_URL } from "./config";
 import { getDeviceId } from "./device";
+import { recordSuccessfulScan } from "./review";
 import { buildComparison, speedLabel, toPrice } from "./pricing";
 
 // How long a scan actually takes, so the wait can say so.
@@ -245,6 +246,7 @@ export default function App() {
       setResult(data);
       setStatus("done");
       void fetchStats(); // the global counter just ticked up
+      void recordSuccessfulScan(); // may show the App Store rating sheet
 
     } catch (e) {
       setError(

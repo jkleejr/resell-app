@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "^54.0.35",
     "expo-application": "~7.0.8",
     "expo-clipboard": "~8.0.8",
@@ -10,6 +11,7 @@
     "expo-image-picker": "~17.0.11",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
+    "expo-store-review": "~9.0.9",
     "expo-updates": "~29.0.18",
     "react": "19.1.0",
     "react-native": "0.81.5"
