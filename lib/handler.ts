@@ -8,6 +8,8 @@ import { priceItem } from "./price.js";
 import {
   itemFacts,
   recordScan,
+  SCAN_ATTEMPTS,
+  type ScanAttempt,
   type ScanEvent,
   type VerifyStatus,
 } from "./scanlog.js";
@@ -80,6 +82,11 @@ export async function handleAnalyzeRequest(
   }
 
   const hint = typeof input.hint === "string" ? input.hint : undefined;
+  // Only a known label is kept; anything else is dropped rather than logged,
+  // so this field can never carry free text into the scan log.
+  const attempt = SCAN_ATTEMPTS.find((a) => a === input.attempt) as
+    | ScanAttempt
+    | undefined;
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return {
@@ -102,6 +109,7 @@ export async function handleAnalyzeRequest(
       photos: images.length,
       hint: Boolean(hint?.trim()),
       scanOfDay: gate.scanOfDay,
+      attempt,
     });
 
   if (!gate.allowed) {

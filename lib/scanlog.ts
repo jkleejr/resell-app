@@ -53,6 +53,21 @@ export type VerifyStatus =
   /** Searched, and the price shown is the verified one. */
   | "verified";
 
+/**
+ * Why the user ran this scan, as the app labels it. Absent on scans from an app
+ * that predates the label (1.0.3, and the 1.0.4 binary until its OTA update
+ * arrives) and from the CLI.
+ */
+export type ScanAttempt =
+  /** A fresh scan from the compose screen. */
+  | "new"
+  /** "Try again" after a failed scan — the same photos, re-sent. */
+  | "retry"
+  /** "Add a photo & retry" after a generic result — the photos plus more. */
+  | "add_photo";
+
+export const SCAN_ATTEMPTS: readonly ScanAttempt[] = ["new", "retry", "add_photo"];
+
 export interface ScanEvent {
   /** When the record was written (epoch ms). */
   ts: number;
@@ -65,6 +80,8 @@ export interface ScanEvent {
   hint: boolean;
   /** The device's Nth scan of the UTC day. A count, not an identity. */
   scanOfDay?: number;
+  /** Why the user ran it. A label, so a retry is visible without linking records. */
+  attempt?: ScanAttempt;
 
   // --- The vision call. Absent on a capped scan.
   visionMs?: number;

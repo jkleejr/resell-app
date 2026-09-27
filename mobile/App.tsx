@@ -123,6 +123,12 @@ export default function App() {
   // rolled over or returns 429 and sets this straight back. That keeps the
   // reset honest without the app having to track a clock the server owns.
   const [limitReached, setLimitReached] = useState(false);
+  // What the compose screen's Identify button counts as, for the anonymous
+  // scan log: a fresh scan, or the "Add a photo & retry" path from a generic
+  // result. ("Try again" after an error labels itself.)
+  const [composeAttempt, setComposeAttempt] = useState<"new" | "add_photo">(
+    "new",
+  );
 
   // Global all-time scan counter (just for fun). Best-effort; ignore failures.
   async function fetchStats() {
@@ -212,7 +218,7 @@ export default function App() {
     return () => clearInterval(id);
   }, [status]);
 
-  async function identify() {
+  async function identify(attempt: "new" | "retry" | "add_photo") {
     if (images.length === 0) return;
     setError(null);
     setResult(null);
@@ -231,6 +237,7 @@ export default function App() {
             mediaType: "image/jpeg",
           })),
           hint: hint.trim() || undefined,
+          attempt,
         }),
       });
       if (!res.ok) {
@@ -259,6 +266,7 @@ export default function App() {
   // Back to the compose screen, KEEPING the current photos + hint so the user
   // can add a logo/label shot and identify again. Used by the "generic" nudge.
   function refine() {
+    setComposeAttempt("add_photo");
     setStatus("idle");
     setResult(null);
     setError(null);
@@ -267,6 +275,7 @@ export default function App() {
 
   // Full reset — clear everything for a brand-new item.
   function reset() {
+    setComposeAttempt("new");
     setStatus("idle");
     setImages([]);
     setHint("");
@@ -660,7 +669,7 @@ export default function App() {
                         ? `Identify · ${images.length} photos`
                         : "Identify"
                   }
-                  onPress={identify}
+                  onPress={() => identify(composeAttempt)}
                   disabled={limitReached}
                 />
                 {images.length < MAX_IMAGES && (
@@ -684,7 +693,7 @@ export default function App() {
               {/* No retry once the cap is hit — it cannot succeed until the
                   limit resets, and offering the button implies otherwise. */}
               {images.length > 0 && !limitReached && (
-                <PrimaryButton label="Try again" onPress={identify} />
+                <PrimaryButton label="Try again" onPress={() => identify("retry")} />
               )}
               <SecondaryButton label="Start over" onPress={reset} />
             </>

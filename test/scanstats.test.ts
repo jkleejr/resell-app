@@ -116,6 +116,17 @@ test("works out how much people scan in a day from the scan-of-day counts alone"
   assert.equal(s.depth.most, 4);
 });
 
+test("counts why scans were run, with older apps' scans as unlabelled", () => {
+  const s = summarize([
+    ok({ ts: DAY1, attempt: "new" }),
+    ok({ ts: DAY1, attempt: "new" }),
+    ok({ ts: DAY1, attempt: "add_photo" }),
+    { ts: DAY1, outcome: "error", totalMs: 900, photos: 1, hint: false, attempt: "retry" },
+    ok({ ts: DAY1 }),
+  ]);
+  assert.deepEqual(s.attempts, { new: 2, add_photo: 1, retry: 1, unlabelled: 1 });
+});
+
 test("totals cost, photos, hints, server retries, and scans per day", () => {
   const s = summarize([
     ok({ ts: DAY1, costUSD: 0.0066, photos: 1 }),
@@ -127,6 +138,7 @@ test("totals cost, photos, hints, server retries, and scans per day", () => {
   assert.deepEqual(s.photos, { "1": 2, "3": 1 });
   assert.equal(s.hintShare, 1 / 3);
   assert.equal(s.serverRetries, 1);
+  assert.deepEqual(s.attempts, { unlabelled: 3 });
   assert.deepEqual(s.perDay, { "2026-09-21": 2, "2026-09-22": 1 });
   assert.equal(s.from, DAY1);
   assert.equal(s.to, DAY2);

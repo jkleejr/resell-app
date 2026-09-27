@@ -184,6 +184,33 @@ test("a rejected request (no image) is not a scan and is not recorded", async ()
   assert.deepEqual(await readScanEvents(), []);
 });
 
+const scanAs = (attempt: unknown) =>
+  handleAnalyzeRequest(
+    { images: [{ image: "aGVsbG8=", mediaType: "image/jpeg" }], attempt },
+    { deviceId: DEVICE },
+  );
+
+test("records why the user ran the scan: new, a retry, or an added photo", async () => {
+  await scanAs("new");
+  await scanAs("retry");
+  await scanAs("add_photo");
+  const events = await readScanEvents();
+  assert.deepEqual(
+    events.map((e) => e.attempt),
+    ["new", "retry", "add_photo"],
+  );
+});
+
+test("an unknown or missing attempt label is left out, never logged as sent", async () => {
+  await scanAs("my secret note");
+  await scanAs(42);
+  await scan(); // older apps send no label at all
+  const events = await readScanEvents();
+  assert.equal(events.length, 3);
+  for (const e of events) assert.equal("attempt" in e, false);
+  assert.ok(!JSON.stringify(events).includes("secret"));
+});
+
 test("SCAN_LOG=off turns recording off", async () => {
   process.env.SCAN_LOG = "off";
   const res = await scan();

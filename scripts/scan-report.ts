@@ -120,6 +120,8 @@ async function main(): Promise<void> {
   console.log("  Photos per scan:");
   breakdown(s.photos);
   row("Added a hint", pct(s.hintShare));
+  console.log("  Why the scan was run (unlabelled = an app from before the label):");
+  breakdown(s.attempts);
 
   heading("Cost");
   row("Total AI spend on logged scans", `$${s.cost.totalUSD.toFixed(2)}`);

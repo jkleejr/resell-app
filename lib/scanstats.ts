@@ -46,6 +46,8 @@ export interface ScanSummary {
   cost: { totalUSD: number; perScanUSD: number };
   photos: Record<string, number>;
   hintShare: number;
+  /** Why scans were run (lib/scanlog.ts ScanAttempt); "unlabelled" = older app. */
+  attempts: Record<string, number>;
   serverRetries: number;
   /** Scans per UTC day, keyed YYYY-MM-DD. */
   perDay: Record<string, number>;
@@ -162,6 +164,7 @@ export function summarize(events: ScanEvent[]): ScanSummary {
     },
     photos: tally(events, (e) => String(e.photos)),
     hintShare: share(events.filter((e) => e.hint).length, events.length),
+    attempts: tally(events, (e) => e.attempt ?? "unlabelled"),
     serverRetries: events.filter((e) => e.retried).length,
     perDay: tally(events, (e) => new Date(e.ts).toISOString().slice(0, 10)),
   };
