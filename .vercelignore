@@ -7,3 +7,8 @@ mobile
 .git
 *.log
 test
+# Local secrets. .vercelignore replaces .gitignore for uploads, so the .env
+# rule there doesn't apply here — without this, `vercel` would upload it.
+.env
+.env.*
+!.env.example
