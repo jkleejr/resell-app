@@ -29,7 +29,7 @@
   </head>
   <body>
     <h1>Privacy Policy</h1>
-    <p class="updated">Loot Check · Last updated September 20, 2026</p>
+    <p class="updated">Loot Check · Last updated September 26, 2026</p>
 
     <p>
       Loot Check ("we", "us", or "the app") helps you identify an item from a
@@ -50,13 +50,14 @@
       <li>
         <strong>A device identifier.</strong> The app generates an
         app-installation identifier and sends it with each scan. We use it only
-        to enforce a daily scan limit per device. It is not your name, email, or
+        to enforce daily scan and price-check limits per device. It is not your name, email, or
         Apple ID, and it is not used to track you across other apps or websites.
       </li>
       <li>
-        <strong>Item details for pricing.</strong> A short text description of
-        the identified item is sent to our server (and, where applicable, to a
-        third-party pricing data provider) to estimate resale value.
+        <strong>Item details for pricing.</strong> For some items, a short text
+        description of the identified item (never your photo) is sent to
+        Anthropic, which runs a web search for comparable prices to check the
+        estimate.
       </li>
       <li>
         <strong>Anonymous scan statistics.</strong> For each scan we keep a
@@ -86,8 +87,8 @@
     <p>We rely on these providers to operate the app:</p>
     <ul>
       <li>
-        <strong>Anthropic</strong> — processes your photos to identify items
-        and generate listings
+        <strong>Anthropic</strong> — processes your photos and item
+        descriptions to identify items, generate listings, and check prices
         (<a href="https://www.anthropic.com/legal/privacy">privacy policy</a>).
       </li>
       <li>
@@ -96,10 +97,6 @@
       <li>
         <strong>Upstash</strong> — stores the per-device daily scan counters
         and the anonymous scan statistics.
-      </li>
-      <li>
-        <strong>Pricing data provider</strong> — when enabled, returns
-        comparable sale prices for an item description.
       </li>
     </ul>
     <p>
