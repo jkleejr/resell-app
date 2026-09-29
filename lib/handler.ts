@@ -1,8 +1,10 @@
 import {
   analyzeImage,
   isTimeout,
+  LEGACY_MARKETPLACES,
   type AnalyzeTrace,
   type ImageInput,
+  type Marketplaces,
 } from "./analyze.js";
 import { priceItem } from "./price.js";
 import {
@@ -13,7 +15,12 @@ import {
   type ScanEvent,
   type VerifyStatus,
 } from "./scanlog.js";
-import { isValidMediaType, type AnalyzeResult } from "./schema.js";
+import {
+  isValidMediaType,
+  PLATFORM_NAMES,
+  type AnalyzeResult,
+  type PlatformName,
+} from "./schema.js";
 import {
   checkAndRecordScan,
   claimSearchBudget,
@@ -82,6 +89,7 @@ export async function handleAnalyzeRequest(
   }
 
   const hint = typeof input.hint === "string" ? input.hint : undefined;
+  const markets = readMarketplaces(input);
   // Only a known label is kept; anything else is dropped rather than logged,
   // so this field can never carry free text into the scan log.
   const attempt = SCAN_ATTEMPTS.find((a) => a === input.attempt) as
@@ -131,6 +139,7 @@ export async function handleAnalyzeRequest(
       hint,
       startedAt + FUNCTION_BUDGET_MS - RESPONSE_MARGIN_MS,
       trace,
+      markets,
     );
     const visionMs = Date.now() - visionStartedAt;
     const checked = await maybeVerifyPrice(result, ctx.deviceId, startedAt);
@@ -246,6 +255,19 @@ interface PriceCheck {
   /** Time and money the check took. Unset when it was never attempted. */
   ms?: number;
   costUSD?: number;
+}
+
+// The seller's marketplace settings, sent by the app with each scan. Only names
+// the app has a fee table for are kept, in the app's order. A request without a
+// usable list — every build before settings existed — gets exactly what those
+// builds always got.
+function readMarketplaces(input: Record<string, unknown>): Marketplaces {
+  const sent = Array.isArray(input.marketplaces) ? input.marketplaces : [];
+  const platforms = PLATFORM_NAMES.filter((p): p is PlatformName =>
+    sent.includes(p),
+  );
+  if (platforms.length === 0) return LEGACY_MARKETPLACES;
+  return { platforms, allowOther: input.otherMarketplaces === true };
 }
 
 function roundTo4(n: number): number {

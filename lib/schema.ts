@@ -68,8 +68,10 @@ export const CRAFT_LEVEL = [
   "professional",
 ] as const;
 
-// Marketplaces the model may recommend. MUST match the platform names in
-// mobile/pricing.ts exactly — the client highlights the row by name.
+// Marketplaces the app knows the fees of. MUST match the platform names in
+// mobile/pricing.ts exactly — the client highlights the row by name. Each scan
+// names which of these the seller uses (see handler.ts); the model recommends
+// from those, or — when the seller allows it — any other marketplace.
 export const PLATFORM_NAMES = [
   "Facebook Marketplace",
   "OfferUp",
@@ -78,7 +80,21 @@ export const PLATFORM_NAMES = [
   "Mercari",
   "eBay",
   "Poshmark",
+  "Etsy",
+  "StockX",
 ] as const;
+
+// What a scan that names no marketplaces may recommend: the list 1.0.x builds
+// shipped with. They have no row for anything newer, so they must never get it.
+export const LEGACY_PLATFORMS: readonly PlatformName[] = [
+  "Facebook Marketplace",
+  "OfferUp",
+  "Vinted",
+  "Depop",
+  "Mercari",
+  "eBay",
+  "Poshmark",
+];
 
 // How quickly the item is likely to sell on the recommended platform.
 export const EXPECTED_SPEED = ["fast", "moderate", "slow"] as const;
@@ -114,8 +130,9 @@ export interface AnalyzeResult {
   estimatedValueUSD: { low: number; high: number };
   /** Ready-to-post marketplace description, generated in the same vision call. */
   listingDescription: string;
-  /** Best marketplace for THIS item to actually sell (model's judgment). */
-  recommendedPlatform: PlatformName;
+  /** Best marketplace for THIS item to actually sell (model's judgment). One of
+   *  the seller's marketplaces, or another site when they allow it. */
+  recommendedPlatform: string;
   /** One-sentence, item-specific reason for the recommendation. */
   recommendationReason: string;
   /** Rough how-fast-it-sells signal on the recommended platform. */
@@ -218,7 +235,9 @@ export const ANALYZE_SCHEMA = {
       required: ["low", "high"],
     },
     listingDescription: { type: "string" },
-    recommendedPlatform: { type: "string", enum: [...PLATFORM_NAMES] },
+    // Not an enum: "or any other marketplace" can't be one. The server checks
+    // it against the seller's list instead (analyze.ts, pickPlatform).
+    recommendedPlatform: { type: "string" },
     recommendationReason: { type: "string" },
     expectedSpeed: { type: "string", enum: [...EXPECTED_SPEED] },
   },

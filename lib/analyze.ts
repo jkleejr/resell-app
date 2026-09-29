@@ -4,13 +4,14 @@ import {
   CATEGORIES,
   CONDITIONS,
   EXPECTED_SPEED,
-  PLATFORM_NAMES,
+  LEGACY_PLATFORMS,
   CRAFT_LEVEL,
   PRICE_CONFIDENCE,
   SPECIFICITY,
   VALUATION_BASIS,
   type AnalyzeResult,
   type MediaType,
+  type PlatformName,
 } from "./schema.js";
 import { cleanText, completeSentences, dropHedges } from "./text.js";
 
@@ -128,12 +129,14 @@ Rules:
       2. What it looks like — subject, composition, colours.
     Then stop. There is no third sentence, and the second one ends at the last colour you name. Filler arrives at the end or not at all, so ending on time is the whole discipline.
     Never write that a piece is signed, hand-painted, framed, mounted, ready to hang, or ready to display — not even when the user's hint says so. The hint exists to help you identify and price the item; it is not copy to relay to a buyer. Claims about provenance are the seller's to make, not yours.
-- recommendedPlatform: the SINGLE marketplace where THIS specific item is most likely to actually sell, and sell quickly. Choose from: Facebook Marketplace, OfferUp, Vinted, Depop, Mercari, eBay, Poshmark. Use where the buyers for this item actually are:
+- recommendedPlatform: the SINGLE marketplace where THIS specific item is most likely to actually sell, and sell quickly. Choose from the marketplaces the user message says this seller uses, spelled exactly as listed there. Use where the buyers for this item actually are:
   • Facebook Marketplace / OfferUp — local pickup. Best for bulky/heavy items (furniture, appliances) and low-value items where shipping isn't worth it.
   • eBay — shippable items buyers search for by brand/model: electronics, collectibles, parts, media, tools, branded gear. Widest buyer base.
   • Poshmark / Depop / Vinted — fashion (clothing, shoes, accessories). Depop/Vinted skew younger, streetwear, and vintage; Poshmark is broad.
   • Mercari — general shippable goods at mid value.
-  • Original and handmade pieces have no perfect home in this list. Pick the closest fit for the piece and audience — usually Depop for small decorative or wearable work, eBay for anything a buyer would search for by subject or style — and say so plainly in recommendationReason.
+  • Etsy — handmade, vintage (20+ years old), art, and craft supplies. The natural home for original and handmade pieces. Without it, usually Depop for small decorative or wearable work, eBay for anything a buyer would search for by subject or style.
+  • StockX — new or deadstock sneakers, streetwear, trading cards and collectibles, and some current electronics. Not for used everyday goods.
+  When the best home for this item isn't among the seller's marketplaces, pick the closest fit from theirs and say so plainly in recommendationReason.
 - recommendationReason: ONE short sentence, specific to this item, on why that platform is the best place to sell it.
 - expectedSpeed: how quickly it is likely to sell on that platform — "fast" (days), "moderate" (a couple of weeks), or "slow" (a month or more / niche demand).
 
@@ -178,6 +181,19 @@ function isRetryable(err: unknown): boolean {
   );
 }
 
+// Where this seller sells, from the app's settings. See handler.ts.
+export interface Marketplaces {
+  /** The listed marketplaces they use, in the app's order. Never empty. */
+  platforms: readonly PlatformName[];
+  /** Whether the model may recommend a marketplace not on the list. */
+  allowOther: boolean;
+}
+
+export const LEGACY_MARKETPLACES: Marketplaces = {
+  platforms: LEGACY_PLATFORMS,
+  allowOther: false,
+};
+
 export async function analyzeImage(
   images: ImageInput[],
   hint?: string,
@@ -185,6 +201,7 @@ export async function analyzeImage(
   // handler derives it from the request's own deadline.
   deadline: number = Date.now() + FIRST_ATTEMPT_MS,
   trace: AnalyzeTrace = {},
+  markets: Marketplaces = LEGACY_MARKETPLACES,
 ): Promise<AnalyzeResult> {
   trace.model = MODEL;
   trace.retried = false;
@@ -203,9 +220,15 @@ export async function analyzeImage(
       : "Analyze this item for resale.";
   // The hint is user-supplied disambiguation (a brand, model, size). Treat it as
   // a clue, not ground truth — the photo still wins if they conflict.
-  const text = hint?.trim()
+  const withHint = hint?.trim()
     ? `${instruction}\n\nThe user adds this hint about the item: "${hint.trim()}". Use it only when consistent with what you see; never contradict the photos.`
     : instruction;
+  // Per request, not in the system prompt: each seller's list is their own.
+  const text =
+    `${withHint}\n\nThis seller sells on: ${markets.platforms.join(", ")}. ` +
+    (markets.allowOther
+      ? "Recommend one of these, unless another well-known marketplace is clearly a much better fit for this item (a specialist site for its category) — then recommend that one by its common name."
+      : "recommendedPlatform must be one of these.");
 
   // Structured outputs constrain the response to ANALYZE_SCHEMA on the normal
   // text channel — cleaner than forced tool use, which can leak tool-call
@@ -281,14 +304,14 @@ export async function analyzeImage(
     throw new Error("Model returned no text content");
   }
 
-  return normalize(JSON.parse(textBlock.text));
+  return normalize(JSON.parse(textBlock.text), markets);
 }
 
 // Structured outputs guarantee the shape, but we still defend against bad
 // values: out-of-range prices, any markup or invisible characters the model
 // might leak into string fields on degenerate inputs, and copy that does not
 // finish its last sentence.
-function normalize(raw: unknown): AnalyzeResult {
+function normalize(raw: unknown, markets: Marketplaces): AnalyzeResult {
   const r = raw as Record<string, unknown>;
 
   const category = oneOf(r.category, CATEGORIES, "other");
@@ -334,8 +357,11 @@ function normalize(raw: unknown): AnalyzeResult {
     listingDescription: completeSentences(
       dropHedges(cleanText(r.listingDescription)),
     ),
-    recommendedPlatform: oneOf(r.recommendedPlatform, PLATFORM_NAMES, "eBay"),
-    recommendationReason: cleanText(r.recommendationReason),
+    ...pickPlatform(
+      cleanText(r.recommendedPlatform),
+      cleanText(r.recommendationReason),
+      markets,
+    ),
     expectedSpeed: oneOf(r.expectedSpeed, EXPECTED_SPEED, "moderate"),
     // Server-set. The handler upgrades these if the verification pass runs.
     priceBasis: "estimate",
@@ -348,6 +374,26 @@ function cleanBrand(value: unknown): string {
   if (typeof value !== "string") return "";
   if (/[<>]|antml|parameter|name=|\//i.test(value)) return "";
   return cleanText(value);
+}
+
+// The model's marketplace, held to the seller's settings. A listed name comes
+// back spelled the way the app's table spells it, since the app matches rows by
+// name. A pick outside their list is kept only when they allow other sites;
+// otherwise it becomes their first marketplace, and the reason goes with it —
+// it was written about a site they don't use.
+function pickPlatform(
+  name: string,
+  reason: string,
+  markets: Marketplaces,
+): { recommendedPlatform: string; recommendationReason: string } {
+  const listed = markets.platforms.find(
+    (p) => p.toLowerCase() === name.toLowerCase(),
+  );
+  if (listed) return { recommendedPlatform: listed, recommendationReason: reason };
+  if (markets.allowOther && name.length > 0 && name.length <= 40) {
+    return { recommendedPlatform: name, recommendationReason: reason };
+  }
+  return { recommendedPlatform: markets.platforms[0]!, recommendationReason: "" };
 }
 
 function oneOf<T extends readonly string[]>(
