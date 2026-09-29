@@ -499,7 +499,7 @@ export default function App() {
               <View style={styles.rowLeft}>
                 <Text style={styles.rowName}>Loot Check decides</Text>
                 <Text style={styles.rowMeta}>
-                  Let AI search all marketplaces
+                  Let AI search all marketplaces (recommended)
                 </Text>
               </View>
               <Switch
