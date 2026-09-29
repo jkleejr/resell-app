@@ -417,10 +417,14 @@ export default function App() {
       <StatusBar barStyle="light-content" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
         <Text style={styles.brand}>Loot Check</Text>
-        <Text style={styles.tagline}>
-          Snap something you want to sell. We'll tell you what it is, what it's
-          worth, and where to sell it.
-        </Text>
+        {/* The pitch is for the start screens only. Once a scan is under way
+            or showing, the photo and result should sit right under the name. */}
+        {status !== "working" && status !== "done" && (
+          <Text style={styles.tagline}>
+            Snap something you want to sell. We'll tell you what it is, what
+            it's worth, and where to sell it.
+          </Text>
+        )}
 
         {(totalScans !== null || status === "working") && (
           <View style={styles.counterRow}>
