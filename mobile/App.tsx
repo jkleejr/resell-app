@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Animated,
   Image,
+  PanResponder,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -18,6 +21,15 @@ import { BACKEND_URL } from "./config";
 import { getDeviceId } from "./device";
 import { recordSuccessfulScan } from "./review";
 import { buildComparison, speedLabel, toPrice } from "./pricing";
+import {
+  clearHistory,
+  deleteScan,
+  loadHistory,
+  saveScan,
+  thumbUri,
+  type SavedScan,
+} from "./history";
+import type { AnalyzeResult } from "./types";
 
 // How long a scan actually takes, so the wait can say so.
 //
@@ -51,29 +63,6 @@ const SEARCH_TELL_SECONDS = 10;
 // estimate already blown past reads as stuck rather than slow, but a silent
 // spinner at 30s reads the same way. Saying it is unusual is the honest part.
 const LONG_WAIT_NOTE = "Taking longer than usual…";
-
-// Mirrors the backend /api/analyze contract (lib/schema.ts).
-type AnalyzeResult = {
-  title: string;
-  category: string;
-  brand: string;
-  condition: string;
-  keywords: string[];
-  searchQuery: string;
-  estimatedValueUSD: { low: number; high: number };
-  specificity: "exact" | "generic";
-  listingDescription: string;
-  recommendedPlatform: string;
-  recommendationReason: string;
-  expectedSpeed: "fast" | "moderate" | "slow";
-  // Added after 1.0.2 shipped. Optional so a build running against an older
-  // backend deploy just falls back to the resale wording.
-  valuationBasis?: "resale" | "original";
-  priceBasis?: "estimate" | "verified";
-  priceNote?: string;
-  /** The model's own read on whether it knows this market well. */
-  priceConfidence?: "high" | "low";
-};
 
 type CapturedImage = { uri: string; base64: string };
 type Status = "idle" | "working" | "done" | "error";
@@ -129,6 +118,14 @@ export default function App() {
   const [composeAttempt, setComposeAttempt] = useState<"new" | "add_photo">(
     "new",
   );
+  // Past scans, listed on the home screen. null until loaded from storage.
+  const [history, setHistory] = useState<SavedScan[] | null>(null);
+  // Set while a past scan is open on the result screen. Its photos weren't
+  // kept, only a thumbnail, so anything that re-sends them is hidden.
+  const [viewingSaved, setViewingSaved] = useState<SavedScan | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  // The in-flight scan's request, so Cancel can abort it.
+  const scanAbort = useRef<AbortController | null>(null);
 
   // Global all-time scan counter (just for fun). Best-effort; ignore failures.
   async function fetchStats() {
@@ -144,6 +141,7 @@ export default function App() {
 
   useEffect(() => {
     void fetchStats();
+    void loadHistory().then(setHistory);
   }, []);
 
   async function copyText(text: string, field: "title" | "listing") {
@@ -223,9 +221,12 @@ export default function App() {
     setError(null);
     setResult(null);
     setStatus("working");
+    const controller = new AbortController();
+    scanAbort.current = controller;
 
     try {
       const res = await fetch(`${BACKEND_URL}/api/analyze`, {
+        signal: controller.signal,
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -250,17 +251,33 @@ export default function App() {
       }
 
       const data = (await res.json()) as AnalyzeResult;
+      if (controller.signal.aborted) return;
       setResult(data);
       setStatus("done");
       void fetchStats(); // the global counter just ticked up
       void recordSuccessfulScan(); // may show the App Store rating sheet
+      // On this device only; the home screen's list picks it up once written.
+      void saveScan(data, images[0]?.uri)
+        .then(loadHistory)
+        .then(setHistory);
 
     } catch (e) {
+      // Cancelled: cancelScan already put the screen back.
+      if (controller.signal.aborted) return;
       setError(
         e instanceof Error ? e.message : "Something went wrong. Try again.",
       );
       setStatus("error");
     }
+  }
+
+  // Stop a scan mid-identify and go back to the compose screen, photos and
+  // detail kept, so the user can change them or start over. The backend may
+  // still finish the call it already has; nothing comes back to the app.
+  function cancelScan() {
+    scanAbort.current?.abort();
+    scanAbort.current = null;
+    setStatus("idle");
   }
 
   // Back to the compose screen, KEEPING the current photos + hint so the user
@@ -275,6 +292,7 @@ export default function App() {
 
   // Full reset — clear everything for a brand-new item.
   function reset() {
+    setViewingSaved(null);
     setComposeAttempt("new");
     setStatus("idle");
     setImages([]);
@@ -282,6 +300,41 @@ export default function App() {
     setResult(null);
     setError(null);
     setCopiedField(null);
+  }
+
+  // Show a past scan on the same result screen a live one uses.
+  function openSaved(scan: SavedScan) {
+    reset();
+    setViewingSaved(scan);
+    setResult(scan.result);
+    setStatus("done");
+    // The list sits below the fold, so the scroll offset would otherwise open
+    // the result partway down.
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }
+
+  // No confirmation: swiping the row open and then tapping Delete is already
+  // two deliberate steps, the same as Mail or Messages.
+  async function removeSaved(scan: SavedScan) {
+    setHistory(await deleteScan(scan.id));
+  }
+
+  function confirmClear() {
+    Alert.alert(
+      "Clear history?",
+      "This deletes every saved scan from this phone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            await clearHistory();
+            setHistory([]);
+          },
+        },
+      ],
+    );
   }
 
   // The price is the model's estimate from the analyze call — no second request.
@@ -336,19 +389,23 @@ export default function App() {
 
   // The photos behind the current scan: the first one large, then a row of
   // every photo when there are several. Shared by the result and error screens.
+  // A past scan kept only its first photo.
+  const photoUris = viewingSaved
+    ? [thumbUri(viewingSaved)].filter((u): u is string => u !== null)
+    : images.map((img) => img.uri);
   const scannedPhotos = (
     <>
-      {images[0] && (
-        <Image source={{ uri: images[0].uri }} style={styles.preview} />
+      {photoUris[0] && (
+        <Image source={{ uri: photoUris[0] }} style={styles.preview} />
       )}
-      {images.length > 1 && (
+      {photoUris.length > 1 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.thumbRow}
         >
-          {images.map((img) => (
-            <Image key={img.uri} source={{ uri: img.uri }} style={styles.thumb} />
+          {photoUris.map((uri) => (
+            <Image key={uri} source={{ uri }} style={styles.thumb} />
           ))}
         </ScrollView>
       )}
@@ -358,17 +415,28 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
         <Text style={styles.brand}>Loot Check</Text>
         <Text style={styles.tagline}>
           Snap something you want to sell. We'll tell you what it is, what it's
           worth, and where to sell it.
         </Text>
 
-        {totalScans !== null && (
-          <Text style={styles.counter}>
-            🛍️ {totalScans.toLocaleString()} items scanned globally
-          </Text>
+        {(totalScans !== null || status === "working") && (
+          <View style={styles.counterRow}>
+            {totalScans !== null ? (
+              <Text style={styles.counter}>
+                🛍️ {totalScans.toLocaleString()} items scanned globally
+              </Text>
+            ) : (
+              <View />
+            )}
+            {status === "working" && (
+              <Pressable onPress={cancelScan} hitSlop={8}>
+                <Text style={styles.cancelScan}>Cancel</Text>
+              </Pressable>
+            )}
+          </View>
         )}
 
         {/* Stays up across "Start over", which clears the error text — without
@@ -497,7 +565,7 @@ export default function App() {
                 piece is never an exact product, and asking its maker for a
                 brand logo or label to photograph asks for something that
                 does not exist. */}
-            {result.specificity === "generic" && !isOriginal && (
+            {result.specificity === "generic" && !isOriginal && !viewingSaved && (
               <View style={styles.nudge}>
                 <Text style={styles.nudgeTitle}>Not sure of the exact product</Text>
                 <Text style={styles.nudgeBody}>
@@ -699,10 +767,47 @@ export default function App() {
             </>
           )}
 
-          {status === "done" && (
-            <PrimaryButton label="Scan another" onPress={reset} />
-          )}
+          {status === "done" &&
+            (viewingSaved ? (
+              <PrimaryButton label="Back" onPress={reset} />
+            ) : (
+              <PrimaryButton label="Scan another" onPress={reset} />
+            ))}
         </View>
+
+        {/* History, on the home screen under the photo buttons. Hidden until
+            it has loaded so the empty-state line never flashes up. */}
+        {status === "idle" && images.length === 0 && history !== null && (
+          <View style={styles.history}>
+            <View style={styles.historyHeader}>
+              <Text style={styles.historyTitle}>History</Text>
+              {history.length > 0 && (
+                <Pressable onPress={confirmClear} hitSlop={8}>
+                  <Text style={styles.historyClear}>Clear</Text>
+                </Pressable>
+              )}
+            </View>
+            {history.length === 0 ? (
+              <Text style={styles.muted}>
+                Nothing yet. Every item you scan will show up here.
+              </Text>
+            ) : (
+              <>
+                {history.map((scan) => (
+                  <HistoryRow
+                    key={scan.id}
+                    scan={scan}
+                    onPress={() => openSaved(scan)}
+                    onDelete={() => removeSaved(scan)}
+                  />
+                ))}
+                <Text style={styles.hintTip}>
+                  Saved on this phone only. Swipe left on a scan to delete it.
+                </Text>
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -733,6 +838,119 @@ function Badge({
   return (
     <View style={[styles.badge, box]}>
       <Text style={[styles.badgeText, text]}>{label}</Text>
+    </View>
+  );
+}
+
+// How far a history row slides open to show its Delete button.
+const DELETE_WIDTH = 88;
+
+// One past scan in the history list: its photo, title, when, and the price.
+// Swiping left slides the row over a Delete button, like Mail on iOS; a long
+// swipe, past half the row, deletes it outright.
+function HistoryRow({
+  scan,
+  onPress,
+  onDelete,
+}: {
+  scan: SavedScan;
+  onPress: () => void;
+  onDelete: () => void;
+}) {
+  const x = useRef(new Animated.Value(0)).current;
+  const open = useRef(false);
+  // Measured, for the long swipe. A phone-width guess until the first layout.
+  const width = useRef(360);
+
+  function settle(toOpen: boolean) {
+    open.current = toOpen;
+    Animated.spring(x, {
+      toValue: toOpen ? -DELETE_WIDTH : 0,
+      useNativeDriver: true,
+      bounciness: 0,
+    }).start();
+  }
+
+  const pan = useRef(
+    PanResponder.create({
+      // Only claim clearly sideways drags, so the list still scrolls.
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_, g) => {
+        const from = open.current ? -DELETE_WIDTH : 0;
+        x.setValue(Math.min(0, Math.max(-width.current, from + g.dx)));
+      },
+      onPanResponderRelease: (_, g) => {
+        const at = (open.current ? -DELETE_WIDTH : 0) + g.dx;
+        // Distance only, never speed: a quick flick should open the row, not
+        // delete something.
+        if (at < -width.current / 2) {
+          Animated.timing(x, {
+            toValue: -width.current,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => onDelete());
+          return;
+        }
+        // A quick flick decides on its own; otherwise go to the nearer side.
+        settle(g.vx < -0.5 || (g.vx <= 0.5 && at < -DELETE_WIDTH / 2));
+      },
+      onPanResponderTerminate: () => settle(open.current),
+    }),
+  ).current;
+
+  const uri = thumbUri(scan);
+  const price = toPrice(scan.result.estimatedValueUSD);
+  const when = new Date(scan.savedAt).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  return (
+    <View
+      style={styles.historyRowWrap}
+      onLayout={(e) => (width.current = e.nativeEvent.layout.width)}
+    >
+      {/* Red across the whole row, so a long swipe never opens a gap; only
+          the right-hand end is the button. */}
+      <View style={styles.historyDeleteBg}>
+        <Pressable onPress={onDelete} style={styles.historyDelete}>
+          <Text style={styles.historyDeleteText}>Delete</Text>
+        </Pressable>
+      </View>
+      <Animated.View
+        style={{ transform: [{ translateX: x }] }}
+        {...pan.panHandlers}
+      >
+        <Pressable
+          // Tapping a row that is swiped open just closes it.
+          onPress={() => (open.current ? settle(false) : onPress())}
+          // VoiceOver users can't swipe; give them Delete in the actions rotor.
+          accessibilityActions={[{ name: "delete", label: "Delete" }]}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === "delete") onDelete();
+          }}
+          // A background change, not the usual opacity: a see-through row
+          // would show the red Delete button underneath.
+          style={({ pressed }) => [
+            styles.historyRow,
+            pressed && styles.historyRowPressed,
+          ]}
+        >
+          {uri ? (
+            <Image source={{ uri }} style={styles.historyThumb} />
+          ) : (
+            <View style={styles.historyThumb} />
+          )}
+          <View style={styles.rowLeft}>
+            <Text style={styles.rowName} numberOfLines={2}>
+              {scan.result.title}
+            </Text>
+            <Text style={styles.rowMeta}>{when}</Text>
+          </View>
+          <Text style={styles.rowNet}>${price.median}</Text>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
@@ -790,6 +1008,13 @@ const styles = StyleSheet.create({
   container: { padding: 24, paddingTop: 32, gap: 16, flexGrow: 1 },
   brand: { color: "#fff", fontSize: 40, fontWeight: "800", letterSpacing: -1 },
   tagline: { color: "#A8A8B0", fontSize: 15, lineHeight: 21 },
+  counterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  // Styled like the history's "Clear", in red.
+  cancelScan: { color: "#EF4444", fontSize: 15, fontWeight: "600" },
   counter: {
     color: "#6EE7B7",
     fontSize: 13,
@@ -929,6 +1154,41 @@ const styles = StyleSheet.create({
   bestTagText: { color: "#0E0E10", fontSize: 10, fontWeight: "800" },
   rowMeta: { color: "#7A7A86", fontSize: 12 },
   rowNet: { color: "#fff", fontSize: 18, fontWeight: "700", marginLeft: 10 },
+  history: { gap: 12, marginTop: 16 },
+  historyHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
+  historyTitle: { color: "#fff", fontSize: 22, fontWeight: "700" },
+  historyClear: { color: "#A8A8B0", fontSize: 15, fontWeight: "600" },
+  historyRowWrap: { borderRadius: 16, overflow: "hidden" },
+  historyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    backgroundColor: "#17171C",
+  },
+  historyRowPressed: { backgroundColor: "#1E1E24" },
+  historyDeleteBg: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "flex-end",
+    backgroundColor: "#DC2626",
+  },
+  historyDelete: {
+    flex: 1,
+    width: DELETE_WIDTH,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  historyDeleteText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  historyThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: "#2A2A33",
+  },
   netNote: { color: "#6A6A76", fontSize: 12, fontStyle: "italic", marginTop: 4 },
   listingFieldLabel: { color: "#8A8A96", fontSize: 13, fontWeight: "600", marginTop: 4 },
   listingTitle: { color: "#fff", fontSize: 16, fontWeight: "700", lineHeight: 22 },
