@@ -225,11 +225,10 @@ export async function analyzeImage(
     ? `${instruction}\n\nThe user adds this hint about the item: "${hint.trim()}". Use it only when consistent with what you see; never contradict the photos.`
     : instruction;
   // Per request, not in the system prompt: each seller's list is their own.
-  const text =
-    `${withHint}\n\nThis seller sells on: ${markets.platforms.join(", ")}. ` +
-    (markets.allowOther
-      ? "Recommend one of these, unless another well-known marketplace is clearly a much better fit for this item (a specialist site for its category) — then recommend that one by its common name."
-      : "recommendedPlatform must be one of these.");
+  // With "Loot Check decides" on, the list is a starting point, not a limit.
+  const text = markets.allowOther
+    ? `${withHint}\n\nThis seller will sell anywhere. For recommendedPlatform and relevantPlatforms, choose freely from any well-known marketplace — these (${markets.platforms.join(", ")}) or any other, such as a specialist site for this item's category — whichever genuinely suit this item best. Give each by its common name.`
+    : `${withHint}\n\nThis seller sells on: ${markets.platforms.join(", ")}. recommendedPlatform and relevantPlatforms must come from these only.`;
 
   // Structured outputs constrain the response to ANALYZE_SCHEMA on the normal
   // text channel — cleaner than forced tool use, which can leak tool-call
