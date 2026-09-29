@@ -80,3 +80,57 @@ test("unknown names in the seller's list are ignored", async () => {
   const body = await scanPicking("Poshmark", { marketplaces: ["Nope", "StockX"] });
   assert.equal(body.recommendedPlatform, "StockX");
 });
+
+// The marketplaces worth showing for this item, as the model ranks them.
+async function relevantFor(
+  pick: string,
+  relevant: string[],
+  settings: Record<string, unknown>,
+) {
+  fake.visionItem = {
+    ...RESALE_ITEM,
+    recommendedPlatform: pick,
+    relevantPlatforms: relevant,
+  };
+  const res = await handleAnalyzeRequest(
+    { images: [{ image: "aGVsbG8=", mediaType: "image/jpeg" }], ...settings },
+    { deviceId: "DEVICE-MARKETS" },
+  );
+  return (res.body as { relevantPlatforms: string[] }).relevantPlatforms;
+}
+
+test("only the seller's marketplaces that suit the item are listed, best first", async () => {
+  const list = await relevantFor("eBay", ["eBay", "StockX", "Mercari"], {
+    marketplaces: ["eBay", "Mercari", "Etsy"],
+  });
+  assert.deepEqual(list, ["eBay", "Mercari"]);
+});
+
+test("the recommended marketplace always leads the list", async () => {
+  const list = await relevantFor("Mercari", ["eBay", "mercari"], {
+    marketplaces: ["eBay", "Mercari"],
+  });
+  assert.deepEqual(list, ["Mercari", "eBay"]);
+});
+
+test("other sites are listed only when the seller allows them", async () => {
+  const settings = { marketplaces: ["eBay"] };
+  assert.deepEqual(await relevantFor("eBay", ["eBay", "Reverb"], settings), ["eBay"]);
+  assert.deepEqual(
+    await relevantFor("eBay", ["eBay", "Reverb"], { ...settings, otherMarketplaces: true }),
+    ["eBay", "Reverb"],
+  );
+});
+
+test("the list holds at most seven marketplaces, each once", async () => {
+  const all = ["Facebook Marketplace", "OfferUp", "Vinted", "Depop", "Mercari", "eBay", "Poshmark", "Etsy", "StockX"];
+  const list = await relevantFor("eBay", ["eBay", "eBay", ...all], { marketplaces: all });
+  assert.equal(list.length, 7);
+  assert.equal(new Set(list).size, 7);
+  assert.equal(list[0], "eBay");
+});
+
+test("a model that lists nothing still shows the recommendation", async () => {
+  const list = await relevantFor("eBay", [], { marketplaces: ["eBay", "Etsy"] });
+  assert.deepEqual(list, ["eBay"]);
+});

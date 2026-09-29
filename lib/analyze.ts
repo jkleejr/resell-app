@@ -138,6 +138,7 @@ Rules:
   • StockX — new or deadstock sneakers, streetwear, trading cards and collectibles, and some current electronics. Not for used everyday goods.
   When the best home for this item isn't among the seller's marketplaces, pick the closest fit from theirs and say so plainly in recommendationReason.
 - recommendationReason: ONE short sentence, specific to this item, on why that platform is the best place to sell it.
+- relevantPlatforms: the marketplaces where THIS item would realistically sell, best first, starting with recommendedPlatform. At most 7, from the same choices as recommendedPlatform. Leave out any whose buyers don't want this kind of item — StockX for a used lamp, Poshmark for a power drill, local-only sites for something small and valuable that ships well. A short list is fine; a padded one sends the seller somewhere it won't sell.
 - expectedSpeed: how quickly it is likely to sell on that platform — "fast" (days), "moderate" (a couple of weeks), or "slow" (a month or more / niche demand).
 
 If the photo is blurry, dark, partial, or ambiguous: describe the item generically, set brand to "", set specificity to "generic", and give a WIDE price range. Degrade gracefully — do NOT invent a brand or model you cannot actually see.
@@ -360,6 +361,7 @@ function normalize(raw: unknown, markets: Marketplaces): AnalyzeResult {
     ...pickPlatform(
       cleanText(r.recommendedPlatform),
       cleanText(r.recommendationReason),
+      r.relevantPlatforms,
       markets,
     ),
     expectedSpeed: oneOf(r.expectedSpeed, EXPECTED_SPEED, "moderate"),
@@ -376,24 +378,47 @@ function cleanBrand(value: unknown): string {
   return cleanText(value);
 }
 
-// The model's marketplace, held to the seller's settings. A listed name comes
-// back spelled the way the app's table spells it, since the app matches rows by
-// name. A pick outside their list is kept only when they allow other sites;
-// otherwise it becomes their first marketplace, and the reason goes with it —
-// it was written about a site they don't use.
-function pickPlatform(
-  name: string,
-  reason: string,
-  markets: Marketplaces,
-): { recommendedPlatform: string; recommendationReason: string } {
+// A marketplace name from the model, held to the seller's settings: one of
+// theirs, spelled the way the app's table spells it (the app matches rows by
+// name); or, when they allow other sites, any sensible name; otherwise null.
+function allowedPlatform(name: string, markets: Marketplaces): string | null {
   const listed = markets.platforms.find(
     (p) => p.toLowerCase() === name.toLowerCase(),
   );
-  if (listed) return { recommendedPlatform: listed, recommendationReason: reason };
-  if (markets.allowOther && name.length > 0 && name.length <= 40) {
-    return { recommendedPlatform: name, recommendationReason: reason };
-  }
-  return { recommendedPlatform: markets.platforms[0]!, recommendationReason: "" };
+  if (listed) return listed;
+  return markets.allowOther && name.length > 0 && name.length <= 40 ? name : null;
+}
+
+const MAX_RELEVANT = 7;
+
+// The recommendation, and the marketplaces worth listing the item on. A pick
+// the seller can't use becomes their first marketplace, and the reason goes
+// with it — it was written about a site they don't use. The list keeps only
+// usable names, once each, recommendation first.
+function pickPlatform(
+  name: string,
+  reason: string,
+  relevant: unknown,
+  markets: Marketplaces,
+): {
+  recommendedPlatform: string;
+  recommendationReason: string;
+  relevantPlatforms: string[];
+} {
+  const picked = allowedPlatform(name, markets);
+  const recommendedPlatform = picked ?? markets.platforms[0]!;
+  const ranked = (Array.isArray(relevant) ? relevant : [])
+    .map((n) => allowedPlatform(cleanText(n), markets))
+    .filter((n): n is string => n !== null);
+  const relevantPlatforms = [...new Set([recommendedPlatform, ...ranked])].slice(
+    0,
+    MAX_RELEVANT,
+  );
+  return {
+    recommendedPlatform,
+    recommendationReason: picked ? reason : "",
+    relevantPlatforms,
+  };
 }
 
 function oneOf<T extends readonly string[]>(

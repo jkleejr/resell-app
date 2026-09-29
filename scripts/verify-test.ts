@@ -39,6 +39,7 @@ function fakeResult(
     listingDescription: "",
     recommendedPlatform: "eBay",
     recommendationReason: "",
+    relevantPlatforms: ["eBay"],
     expectedSpeed: "moderate",
     priceBasis: "estimate",
     priceNote: "",

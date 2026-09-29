@@ -135,6 +135,10 @@ export interface AnalyzeResult {
   recommendedPlatform: string;
   /** One-sentence, item-specific reason for the recommendation. */
   recommendationReason: string;
+  /** The seller's marketplaces worth listing THIS item on, best first, the
+   *  recommendation always leading. At most 7. The app's Where to sell shows
+   *  exactly these. */
+  relevantPlatforms: string[];
   /** Rough how-fast-it-sells signal on the recommended platform. */
   expectedSpeed: ExpectedSpeed;
 
@@ -239,6 +243,7 @@ export const ANALYZE_SCHEMA = {
     // it against the seller's list instead (analyze.ts, pickPlatform).
     recommendedPlatform: { type: "string" },
     recommendationReason: { type: "string" },
+    relevantPlatforms: { type: "array", items: { type: "string" } },
     expectedSpeed: { type: "string", enum: [...EXPECTED_SPEED] },
   },
   required: [
@@ -256,6 +261,7 @@ export const ANALYZE_SCHEMA = {
     "listingDescription",
     "recommendedPlatform",
     "recommendationReason",
+    "relevantPlatforms",
     "expectedSpeed",
   ],
 } as const;
