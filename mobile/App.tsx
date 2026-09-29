@@ -777,8 +777,8 @@ export default function App() {
                 <Text style={styles.nudgeTitle}>Not sure of the exact product</Text>
                 <Text style={styles.nudgeBody}>
                   This looks like a generic match. Add a close-up of the brand
-                  logo or label — or type the brand in the detail field — and
-                  identify again for a more accurate result and price.
+                  logo or label, or add a hint and identify again for more
+                  accurate results.
                 </Text>
                 <SecondaryButton
                   label="Add a photo & retry"

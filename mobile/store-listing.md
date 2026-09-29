@@ -1,7 +1,7 @@
 # App Store listing — Loot Check
 
 Copy each field into the matching App Store Connect field.
-Current submission: **1.0.4** (build auto-increments remotely; 1.0.3 went live 4 Sep 2026.
+Current submission: **1.0.5** (build auto-increments remotely; 1.0.3 went live 4 Sep 2026.
 App Store Connect will not accept a new version while another is still in review).
 
 ## App Name (max 30)
@@ -27,21 +27,34 @@ Paste into App Store Connect → the new version's **What's New in This Version*
 Required for every update; it's the one listing field a new version forces you to fill in.
 
 ```
-- Photos stay on screen if a scan fails
-- More accurate wait time estimates
-- Updated app icon
+- Your past scans are now saved in History on the home screen
+- New Settings: choose which marketplaces you sell on
+- Etsy and StockX added
+- Where to sell now shows only the marketplaces that fit your item
+- Cancel a scan while it's identifying
+- Tap the camera square to add more photos
+- Swipe left to delete a past scan
+- Cleaner results page
 ```
 
-> Kept short and casual to match the notes live on the App Store. The rating
-> prompt added in this version is deliberately not mentioned.
+> Kept short and casual to match the notes live on the App Store.
 
 ### Release-note history
 
+- **1.0.5** — scan history on the home screen (saved on the device only), with
+  swipe-to-delete and retry from a past scan; cancel a scan mid-identify; a
+  camera slot in place of "Add another photo"; a Settings page to choose
+  marketplaces, with Etsy and StockX added and "Loot Check decides" letting the
+  AI suggest any site; Where to sell lists only the marketplaces that suit the
+  item (needs the matching backend deploy); results page restyled.
+  Needs a new binary: history adds expo-file-system (native).
+  Notes as pasted: see the block above.
 - **1.0.4** — asks for an App Store rating (Apple's native sheet) after the
   10th successful scan, then at most once per 30 days. Also: the scanned photos
   stay above a failed scan's error, the verified-scan wait estimate is ~25s,
-  and a revised icon (larger tag).
-  Notes as pasted: see the block above.
+  and a revised icon (larger tag). Notes as pasted:
+  "Photos stay on screen if a scan fails / More accurate wait time estimates /
+  Updated app icon".
 - **1.0.3** — released 4 Sep 2026. Notes as live on the App Store:
   "Improved listing descriptions - Added high confidence labels - Added web
   searches - Displays wait time estimates". Detail: original/handmade valuation surfaced in the UI: originals show
@@ -113,15 +126,17 @@ Free to use. No ads, no account required. Find out what your stuff is worth with
 Most listing metadata carries over from the last version untouched. These are the
 things a new version actually makes you handle:
 
-- [ ] **Version string** — `mobile/app.json` → `expo.version` is `1.0.4`. The build
+- [ ] **Version string** — `mobile/app.json` → `expo.version` is `1.0.5`. The build
       number is managed remotely (`appVersionSource: "remote"` in `eas.json`) and
       `autoIncrement` bumps it on the next production build. Don't set it by hand.
-- [ ] **Previous version out of review** — App Store Connect will not accept 1.0.4 while 1.0.3
+- [ ] **Previous version out of review** — App Store Connect will not accept 1.0.5 while 1.0.4
       is still `Waiting for Review` or `In Review`. Check before submitting.
-- [ ] **New build** — this build changes JS only, so an OTA update could in principle
-      carry it. Ship it as a real build anyway: OTA channels are keyed to the app
-      version, so a 1.0.3 update never reaches the 1.0.2 installs that make up the
-      entire user base. `eas build -p ios --profile production`, then `eas submit -p ios`.
+- [ ] **Deploy the backend first** — 1.0.5's per-item Where to sell and "Loot Check
+      decides" need it. It's safe for older installs: they send no marketplace list
+      and keep getting the original seven.
+- [ ] **New build** — 1.0.5 adds a native module (expo-file-system, for scan history),
+      so it can only ship as a new binary; an OTA update can't carry it.
+      `eas build -p ios --profile production`, then `eas submit -p ios`.
 - [ ] **What's New** — paste the block above. Mandatory field on every update.
 - [ ] **Screenshots** — not required to change. The result screen now reads
       "Estimated value" for originals and can show a provenance line under the
