@@ -117,6 +117,23 @@ test("an original that a web search repriced keeps both the estimate and the ver
   assert.equal(e!.costUSD, 0.0466);
 });
 
+test("a price from listings of comparable pieces says so in the note", async () => {
+  process.env.PRICE_VERIFY = "on";
+  fake.visionItem = ORIGINAL_ITEM;
+
+  const res = await scan();
+  assert.equal(res.body.priceNote, "Based on Etsy listings of similar items");
+});
+
+test("a price from listings of this exact item keeps the plain note", async () => {
+  process.env.PRICE_VERIFY = "on";
+  fake.visionItem = ORIGINAL_ITEM;
+  fake.verifyReply = { ...fake.verifyReply, match: "exact" };
+
+  const res = await scan();
+  assert.equal(res.body.priceNote, "Based on Etsy listings");
+});
+
 test("a web search whose findings were discarded is recorded as no_listings", async () => {
   process.env.PRICE_VERIFY = "on";
   fake.visionItem = ORIGINAL_ITEM;

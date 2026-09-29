@@ -94,6 +94,7 @@ export async function startFakeServices(): Promise<FakeServices> {
       fake.visionStallFirstMs = 0;
       fake.verifyReply = {
         findings: "Comparable originals ask $90-150.",
+        match: "similar",
         confidence: "high",
         rangeUSD: { low: 90, high: 150 },
         note: "Based on Etsy listings",

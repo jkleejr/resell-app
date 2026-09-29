@@ -40,6 +40,9 @@ export const VALUATION_BASIS = ["resale", "original"] as const;
 // of which scans the model itself considered a guess, which is worth having
 // when the time comes to check prices against what things actually sold for.
 export const PRICE_CONFIDENCE = ["high", "low"] as const;
+// Whether the listings a price search found were for this exact item, or only
+// for comparable ones. Decides the wording of the note under the price.
+export const LISTING_MATCH = ["exact", "similar"] as const;
 
 // Where the price we return actually came from. Set by the SERVER, never by the
 // model: "verified" only after lib/verify.ts successfully refined the range.
@@ -166,6 +169,8 @@ export const VERIFY_SCHEMA = {
     // Reasoning first: what the search actually turned up, in prose, before any
     // number is generated. Same ordering principle as specificity above.
     findings: { type: "string" },
+    // Right after findings, so it is judged from what the search showed.
+    match: { type: "string", enum: [...LISTING_MATCH] },
     // "low" tells us to DISCARD the result and keep the model's own estimate —
     // a bad comp is worse than an honest guess.
     confidence: { type: "string", enum: [...PRICE_CONFIDENCE] },
@@ -180,7 +185,7 @@ export const VERIFY_SCHEMA = {
     },
     note: { type: "string" },
   },
-  required: ["findings", "confidence", "rangeUSD", "note"],
+  required: ["findings", "match", "confidence", "rangeUSD", "note"],
 } as const;
 
 // JSON Schema passed to the model. Structured outputs require

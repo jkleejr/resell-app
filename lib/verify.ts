@@ -136,9 +136,10 @@ You are giving the seller an IDEA of what their piece could fetch, not an apprai
 // discipline is the same either way: interpret the spread, don't report it.
 const REPORTING_RULES = `Then report, in this order:
 - findings: what the search actually showed — the prices you saw and where. One or two sentences. If the results were thin, off-target, or about a different item, say so plainly.
+- match: "exact" only when the prices you are going on are listings of THIS item — the same product, model, or the very same piece. "similar" when they are comparable items: the same kind of thing from other makers, other models, other artists. A one-of-a-kind piece is almost always "similar", since what the search finds is other people's work. When in doubt, "similar".
 - confidence: "high" when the results give you a workable idea of the price; "low" when they were off-target, about a different item, or carried no prices at all. Calibrate this to the job: for a one-of-a-kind piece the seller wants a ballpark, so a few comparable listings with visible prices is enough and demanding a thorough survey just returns nothing. For a resale item the bar is higher, because a real going rate exists and asking prices are not it. When genuinely in doubt choose "low" — the existing estimate is kept and nothing is lost.
 - rangeUSD: NOT the raw spread of what you found. The cheapest listing is usually an outlier and so is the dearest — one is a bargain or a mistake, the other is someone hoping. Trim both ends and give the band where a piece like this would realistically change hands: above the lowest asking price, below the highest, and drawn from the bulk of what you saw in the middle. Widen it a little when the results were thin, because a thin sample deserves an honest band — but a range so wide it spans every possibility tells the seller nothing. For an original, keep the band generous — a tier spans real spread and pretending otherwise is false precision — but never so wide it spans two tiers. If confidence is "low", repeat the existing estimate unchanged.
-- note: ONE short line under the price saying WHERE it came from. Under 40 characters. Never describe the item — the seller is looking at it, so "Based on Etsy listings for handmade stoneware mugs" wastes its second half saying what they already know. "Based on Etsy listings" is the whole note. Default to "Based on prior listings" and name a marketplace only when one clearly supplied the prices, without reaching for the same one from habit.
+- note: ONE short line under the price saying WHERE it came from. Under 40 characters. Do not say whether the listings were for this item or similar ones — match carries that, and the app words it. Never describe the item — the seller is looking at it, so "Based on Etsy listings for handmade stoneware mugs" wastes its second half saying what they already know. "Based on Etsy listings" is the whole note. Default to "Based on prior listings" and name a marketplace only when one clearly supplied the prices, without reaching for the same one from habit.
   Name at most one marketplace, or none. Say "listed" for active listings and "sold" ONLY for completed sales — never call an asking price a sale.`;
 
 function buildSystemPrompt(basis: AnalyzeResult["valuationBasis"]): string {
@@ -312,6 +313,9 @@ function interpret(
   }
 
   const note = cleanText(r.note).slice(0, 80);
+  // Anything but a clear "exact" reads as similar: claiming the search found
+  // this very item is the stronger statement, so it has to be earned.
+  const exact = r.match === "exact";
 
   // Length backstop. The prompt asks for under 40 characters and mostly gets
   // it, but it drifts — "Based on Etsy listings" one run, "Based on active
@@ -320,10 +324,13 @@ function interpret(
   // generic line instead. Nothing is lost: the overflow is always padding, and
   // the note only ever claimed to say where the number came from.
   const GENERIC = "Based on prior listings";
+  const where = note.length > 0 && note.length <= 40 ? note : GENERIC;
   return {
     low,
     high,
-    note: note.length > 0 && note.length <= 40 ? note : GENERIC,
+    // Added here rather than asked of the model, so the 40-character budget
+    // above stays about the source and the wording never drifts.
+    note: exact ? where : `${where} of similar items`,
   };
 }
 
