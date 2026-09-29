@@ -601,38 +601,45 @@ export default function App() {
         {/* Compose: thumbnails + hint (idle only) */}
         {status === "idle" && images.length > 0 && (
           <>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.thumbRow}
-            >
-              {images.map((img, i) => (
-                <View key={img.uri} style={styles.thumbWrap}>
-                  <Image source={{ uri: img.uri }} style={styles.thumb} />
-                  <Pressable
-                    onPress={() => removeImage(i)}
-                    style={styles.thumbRemove}
-                    hitSlop={8}
-                  >
-                    <Text style={styles.thumbRemoveText}>×</Text>
-                  </Pressable>
+            {/* Two per row, so all four photos fit on any phone. The empty
+                slot for the next photo takes the next free spot. Always two
+                photo-height rows, so the detail field below never moves as
+                photos come and go. */}
+            <View style={styles.thumbGrid}>
+              {pairs(
+                images.length < MAX_IMAGES ? [...images, null] : images,
+              ).map((pair, r) => (
+                <View key={r} style={styles.thumbGridRow}>
+                  {pair.map((img, c) =>
+                    img ? (
+                      <View key={img.uri} style={styles.thumbWrap}>
+                        <Image source={{ uri: img.uri }} style={styles.thumb} />
+                        <Pressable
+                          onPress={() => removeImage(r * 2 + c)}
+                          style={styles.thumbRemove}
+                          hitSlop={8}
+                        >
+                          <Text style={styles.thumbRemoveText}>×</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <Pressable
+                        key="add"
+                        onPress={() => addPhoto("camera")}
+                        accessibilityRole="button"
+                        accessibilityLabel="Take another photo"
+                        style={({ pressed }) => [
+                          styles.addSlot,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Ionicons name="camera-outline" size={28} color="#6A6A76" />
+                      </Pressable>
+                    ),
+                  )}
                 </View>
               ))}
-              {/* An empty slot for the next photo, until the row is full. */}
-              {images.length < MAX_IMAGES && (
-                <Pressable
-                  onPress={() => addPhoto("camera")}
-                  accessibilityRole="button"
-                  accessibilityLabel="Take another photo"
-                  style={({ pressed }) => [
-                    styles.addSlot,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Ionicons name="camera-outline" size={28} color="#6A6A76" />
-                </Pressable>
-              )}
-            </ScrollView>
+            </View>
 
             <View style={styles.hintWrap}>
               <Text style={styles.hintLabel}>Add a detail (optional)</Text>
@@ -906,7 +913,7 @@ export default function App() {
                     limitReached
                       ? "Daily limit reached"
                       : images.length > 1
-                        ? `Identify · ${images.length} photos`
+                        ? `Identify, ${images.length} photos`
                         : "Identify"
                   }
                   onPress={() => identify(composeAttempt)}
@@ -977,6 +984,13 @@ export default function App() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+// [a, b, c] -> [[a, b], [c]]
+function pairs<T>(items: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += 2) out.push(items.slice(i, i + 2));
+  return out;
 }
 
 // Neutral by default. The two tinted tones are the only place the app states
@@ -1217,6 +1231,13 @@ const styles = StyleSheet.create({
   },
   thumbRow: { gap: 10, paddingVertical: 2, alignItems: "center" },
   thumbWrap: { position: "relative" },
+  thumbGrid: { gap: 12, paddingTop: 6, height: 6 + 96 * 2 + 12 },
+  thumbGridRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    height: 96,
+  },
   // A little smaller than a photo, so it reads as a slot rather than one more.
   addSlot: {
     width: 80,
