@@ -14,6 +14,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as Clipboard from "expo-clipboard";
@@ -25,6 +26,7 @@ import {
   clearHistory,
   deleteScan,
   loadHistory,
+  savedPhoto,
   saveScan,
   thumbUri,
   type SavedScan,
@@ -120,8 +122,8 @@ export default function App() {
   );
   // Past scans, listed on the home screen. null until loaded from storage.
   const [history, setHistory] = useState<SavedScan[] | null>(null);
-  // Set while a past scan is open on the result screen. Its photos weren't
-  // kept, only a thumbnail, so anything that re-sends them is hidden.
+  // Set while a past scan is open on the result screen. Only its first photo
+  // was kept, so that is all it shows and all a retry starts from.
   const [viewingSaved, setViewingSaved] = useState<SavedScan | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   // The in-flight scan's request, so Cancel can abort it.
@@ -288,6 +290,17 @@ export default function App() {
     setResult(null);
     setError(null);
     setCopiedField(null);
+  }
+
+  // "Add a photo & retry" on a past scan: start a new compose from the photo
+  // it saved, so the user can add a close-up and identify again. Without a
+  // readable photo there is nothing to retry, so the compose starts empty.
+  async function refineSaved(scan: SavedScan) {
+    const photo = await savedPhoto(scan);
+    reset();
+    if (photo) setImages([photo]);
+    setComposeAttempt("add_photo");
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
   }
 
   // Full reset — clear everything for a brand-new item.
@@ -473,6 +486,20 @@ export default function App() {
                   </Pressable>
                 </View>
               ))}
+              {/* An empty slot for the next photo, until the row is full. */}
+              {images.length < MAX_IMAGES && (
+                <Pressable
+                  onPress={() => addPhoto("camera")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Take another photo"
+                  style={({ pressed }) => [
+                    styles.addSlot,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Ionicons name="camera-outline" size={28} color="#6A6A76" />
+                </Pressable>
+              )}
             </ScrollView>
 
             <View style={styles.hintWrap}>
@@ -486,8 +513,7 @@ export default function App() {
                 returnKeyType="done"
               />
               <Text style={styles.hintTip}>
-                Tip: include a close-up of the brand logo or label for the best
-                match.
+                Tip: include the brand logo or label for better accuracy.
               </Text>
             </View>
           </>
@@ -560,29 +586,9 @@ export default function App() {
                 <Text style={styles.brandLine}>Brand: {result.brand}</Text>
               ) : null}
               {result.keywords.length > 0 && (
-                <Text style={styles.keywords}>{result.keywords.join(" · ")}</Text>
+                <Text style={styles.keywords}>{result.keywords.join(", ")}</Text>
               )}
             </View>
-
-            {/* Reshoot nudge when the match is only generic. Not for
-                originals: they are always "generic" because a one-of-a-kind
-                piece is never an exact product, and asking its maker for a
-                brand logo or label to photograph asks for something that
-                does not exist. */}
-            {result.specificity === "generic" && !isOriginal && !viewingSaved && (
-              <View style={styles.nudge}>
-                <Text style={styles.nudgeTitle}>Not sure of the exact product</Text>
-                <Text style={styles.nudgeBody}>
-                  This looks like a generic match. Add a close-up of the brand
-                  logo or label — or type the brand in the detail field — and
-                  identify again for a more accurate result and price.
-                </Text>
-                <SecondaryButton
-                  label="Add a photo & retry"
-                  onPress={refine}
-                />
-              </View>
-            )}
 
             {/* Price. An original piece has never been sold, so "resale" is
                 the wrong frame for it — the number is what the maker could
@@ -628,12 +634,36 @@ export default function App() {
               )}
             </View>
 
+            {/* Reshoot nudge when the match is only generic. Not for
+                originals: they are always "generic" because a one-of-a-kind
+                piece is never an exact product, and asking its maker for a
+                brand logo or label to photograph asks for something that
+                does not exist. */}
+            {result.specificity === "generic" && !isOriginal && (
+              <View style={styles.nudge}>
+                <Text style={styles.nudgeTitle}>Not sure of the exact product</Text>
+                <Text style={styles.nudgeBody}>
+                  This looks like a generic match. Add a close-up of the brand
+                  logo or label — or type the brand in the detail field — and
+                  identify again for a more accurate result and price.
+                </Text>
+                <SecondaryButton
+                  label="Add a photo & retry"
+                  onPress={() =>
+                    viewingSaved ? void refineSaved(viewingSaved) : refine()
+                  }
+                />
+              </View>
+            )}
+
             {/* Where to sell */}
             {comparison && (
               <View style={styles.card}>
-                <Text style={styles.sectionLabel}>Where to sell</Text>
+                <Text style={styles.sectionLabel}>
+                  Where to sell
+                </Text>
                 <Text style={styles.recLead}>
-                  Best bet: {result.recommendedPlatform}
+                  {result.recommendedPlatform}
                 </Text>
                 {result.recommendationReason ? (
                   <Text style={styles.reason}>
@@ -658,7 +688,13 @@ export default function App() {
                         )}
                       </View>
                       <Text style={styles.rowMeta}>
-                        {row.feeNote} · {row.shipping} · {row.speed}
+                        {/* A fee in red, as money off the top. "No seller fee"
+                            is good news, so it stays grey. */}
+                        <Text style={row.feeFree ? null : styles.rowFee}>
+                          {row.feeNote}
+                        </Text>
+                        {", "}
+                        {row.shipping}
                       </Text>
                     </View>
                     <Text style={styles.rowNet}>${row.net}</Text>
@@ -672,9 +708,10 @@ export default function App() {
 
             {/* Ready-to-post listing */}
             <View style={styles.card}>
-              <Text style={styles.sectionLabel}>Ready-to-post listing</Text>
+              <Text style={styles.sectionLabel}>
+                Ready-to-post listing
+              </Text>
 
-              <Text style={styles.listingFieldLabel}>Title</Text>
               {/* Selectable, and with no numberOfLines: the whole listing text
                   is on screen, so what the seller reads is exactly what the
                   copy button puts on the clipboard. */}
@@ -695,7 +732,6 @@ export default function App() {
 
               {result.listingDescription ? (
                 <>
-                  <Text style={styles.listingFieldLabel}>Description</Text>
                   <Text style={styles.listingBody} selectable>
                     {result.listingDescription}
                   </Text>
@@ -745,16 +781,10 @@ export default function App() {
                   disabled={limitReached}
                 />
                 {images.length < MAX_IMAGES && (
-                  <>
-                    <SecondaryButton
-                      label="Add another photo"
-                      onPress={() => addPhoto("camera")}
-                    />
-                    <SecondaryButton
-                      label="Add from library"
-                      onPress={() => addPhoto("library")}
-                    />
-                  </>
+                  <SecondaryButton
+                    label="Add from library"
+                    onPress={() => addPhoto("library")}
+                  />
                 )}
                 <SecondaryButton label="Start over" onPress={reset} />
               </>
@@ -1036,8 +1066,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#1A1A1F",
   },
-  thumbRow: { gap: 10, paddingVertical: 2 },
+  thumbRow: { gap: 10, paddingVertical: 2, alignItems: "center" },
   thumbWrap: { position: "relative" },
+  // A little smaller than a photo, so it reads as a slot rather than one more.
+  addSlot: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "#3A3A44",
+    backgroundColor: "#17171C",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   thumb: {
     width: 96,
     height: 96,
@@ -1122,20 +1164,20 @@ const styles = StyleSheet.create({
   nudgeTitle: { color: "#F5D88A", fontSize: 16, fontWeight: "700" },
   nudgeBody: { color: "#C8C8D0", fontSize: 14, lineHeight: 20 },
   sectionLabel: {
-    color: "#8A8A96",
+    color: "#4ADE80",
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 0.5,
     textTransform: "uppercase",
   },
   price: { color: "#fff", fontSize: 38, fontWeight: "800" },
-  priceRange: { color: "#A8A8B0", fontSize: 15 },
-  // Same green as the "best platform" lead — this line means "we checked".
+  priceRange: { color: "#fff", fontSize: 15 },
+  // Same green as the section headings — this line means "we checked".
   priceNote: { color: "#4ADE80", fontSize: 13, marginTop: 8 },
   priceNoteMuted: { color: "#8A8A93", fontSize: 13, marginTop: 8 },
-  recLead: { color: "#4ADE80", fontSize: 17, fontWeight: "700" },
+  recLead: { color: "#fff", fontSize: 17, fontWeight: "700" },
   reason: { color: "#C8C8D0", fontSize: 14, lineHeight: 20 },
-  speed: { color: "#A8A8B0", fontSize: 13, marginBottom: 6 },
+  speed: { color: "#C8C8D0", fontSize: 14, lineHeight: 20, marginBottom: 6 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -1157,6 +1199,7 @@ const styles = StyleSheet.create({
   },
   bestTagText: { color: "#0E0E10", fontSize: 10, fontWeight: "800" },
   rowMeta: { color: "#7A7A86", fontSize: 12 },
+  rowFee: { color: "#EF4444" },
   rowNet: { color: "#fff", fontSize: 18, fontWeight: "700", marginLeft: 10 },
   history: { gap: 12, marginTop: 16 },
   historyHeader: {
@@ -1194,9 +1237,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#2A2A33",
   },
   netNote: { color: "#6A6A76", fontSize: 12, fontStyle: "italic", marginTop: 4 },
-  listingFieldLabel: { color: "#8A8A96", fontSize: 13, fontWeight: "600", marginTop: 4 },
   listingTitle: { color: "#fff", fontSize: 16, fontWeight: "700", lineHeight: 22 },
-  listingBody: { color: "#C8C8D0", fontSize: 14, lineHeight: 21 },
+  listingBody: { color: "#fff", fontSize: 14, lineHeight: 21 },
   copyBtn: {
     backgroundColor: "#2A2A33",
     borderRadius: 12,

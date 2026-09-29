@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Directory, File, Paths } from "expo-file-system";
-import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import type { AnalyzeResult } from "./types";
 
 // Past scans, kept on this device only — never sent to the backend, which
@@ -8,9 +7,11 @@ import type { AnalyzeResult } from "./types";
 // and the privacy policy). Deleting the app deletes the history with it.
 //
 // The results themselves are one JSON array in AsyncStorage, newest first. The
-// first photo of each scan is kept as a small JPEG in the document directory:
-// the photos the scan used live in the image manipulator's cache, which the OS
-// may clear at any time.
+// first photo of each scan is copied into the document directory: the photos
+// the scan used live in the image manipulator's cache, which the OS may clear
+// at any time. It is kept at the size the scan sent, not shrunk, so "Add a
+// photo & retry" on a past scan re-sends the same photo the first scan did.
+// (Scans saved before that kept a 512px copy; those still load and retry.)
 //
 // Best-effort throughout, like review.ts: history is never worth breaking a
 // scan over, so every failure is swallowed, and a thumbnail that can't be
@@ -18,7 +19,6 @@ import type { AnalyzeResult } from "./types";
 
 const HISTORY_KEY = "scanHistory";
 const MAX_SAVED = 50;
-const THUMB_WIDTH = 512;
 
 export type SavedScan = {
   id: string;
@@ -71,15 +71,10 @@ export async function saveScan(
     let thumbName: string | undefined;
     if (photoUri) {
       try {
-        const small = await manipulateAsync(
-          photoUri,
-          [{ resize: { width: THUMB_WIDTH } }],
-          { compress: 0.6, format: SaveFormat.JPEG },
-        );
         const dir = scansDir();
         if (!dir.exists) dir.create({ intermediates: true });
         const name = `${id}.jpg`;
-        new File(small.uri).move(new File(dir, name));
+        new File(photoUri).copy(new File(dir, name));
         thumbName = name;
       } catch {
         // saved without a photo
@@ -92,6 +87,21 @@ export async function saveScan(
     await writeHistory(all.slice(0, MAX_SAVED));
   } catch {
     // no-op — history is optional
+  }
+}
+
+// The saved photo as a scan input, for retrying a past scan. Null when it has
+// none or the file can't be read.
+export async function savedPhoto(
+  scan: SavedScan,
+): Promise<{ uri: string; base64: string } | null> {
+  if (!scan.thumbName) return null;
+  try {
+    const file = new File(scansDir(), scan.thumbName);
+    if (!file.exists) return null;
+    return { uri: file.uri, base64: await file.base64() };
+  } catch {
+    return null;
   }
 }
 

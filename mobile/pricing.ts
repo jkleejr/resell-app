@@ -17,46 +17,38 @@ export function toPrice(estimate: { low: number; high: number }): PriceResult {
   return { low, median: Math.round((low + high) / 2), high };
 }
 
-type Shipping = "local" | "prepaid" | "you_ship";
-type Speed = "fast_local" | "days" | "days_weeks";
+type Shipping = "local" | "prepaid";
 
 type Platform = {
   name: string;
   feePct: number;
   flatFee: number;
   shipping: Shipping;
-  speed: Speed;
 };
 
 // Hard-coded public fee structures (2026). Revisit occasionally.
 const PLATFORMS: Platform[] = [
-  { name: "Facebook Marketplace", feePct: 0.0, flatFee: 0, shipping: "local", speed: "fast_local" },
-  { name: "OfferUp", feePct: 0.0, flatFee: 0, shipping: "local", speed: "fast_local" },
-  { name: "Vinted", feePct: 0.0, flatFee: 0, shipping: "prepaid", speed: "days" },
-  { name: "Depop", feePct: 0.0, flatFee: 0, shipping: "prepaid", speed: "days" },
-  { name: "Mercari", feePct: 0.1, flatFee: 0, shipping: "you_ship", speed: "days" },
-  { name: "eBay", feePct: 0.13, flatFee: 0.35, shipping: "you_ship", speed: "days_weeks" },
-  { name: "Poshmark", feePct: 0.2, flatFee: 0, shipping: "prepaid", speed: "days" },
+  { name: "Facebook Marketplace", feePct: 0.0, flatFee: 0, shipping: "local" },
+  { name: "OfferUp", feePct: 0.0, flatFee: 0, shipping: "local" },
+  { name: "Vinted", feePct: 0.0, flatFee: 0, shipping: "prepaid" },
+  { name: "Depop", feePct: 0.0, flatFee: 0, shipping: "prepaid" },
+  { name: "Mercari", feePct: 0.1, flatFee: 0, shipping: "prepaid" },
+  { name: "eBay", feePct: 0.13, flatFee: 0.35, shipping: "prepaid" },
+  { name: "Poshmark", feePct: 0.2, flatFee: 0, shipping: "prepaid" },
 ];
 
 const SHIPPING_LABEL: Record<Shipping, string> = {
-  local: "Local pickup",
+  local: "Local",
   prepaid: "Prepaid label",
-  you_ship: "You ship",
-};
-
-const SPEED_LABEL: Record<Speed, string> = {
-  fast_local: "Fast · local",
-  days: "Days",
-  days_weeks: "Days–weeks",
 };
 
 export type ComparisonRow = {
   name: string;
   net: number;
   feeNote: string;
+  /** No percentage and no flat fee: the seller keeps the whole price. */
+  feeFree: boolean;
   shipping: string;
-  speed: string;
   recommended: boolean;
 };
 
@@ -75,11 +67,11 @@ function feeNote(p: Platform): string {
 export function speedLabel(speed: "fast" | "moderate" | "slow"): string {
   switch (speed) {
     case "fast":
-      return "Likely to sell fast — often within days";
+      return "Likely to sell fast — often within days.";
     case "moderate":
-      return "Usually sells within a couple of weeks";
+      return "Usually sells within a couple of weeks.";
     case "slow":
-      return "May take a month or more — niche demand";
+      return "May take a month or more — niche demand.";
   }
 }
 
@@ -93,8 +85,8 @@ export function buildComparison(
     name: p.name,
     net: netPayout(anchor, p),
     feeNote: feeNote(p),
+    feeFree: p.feePct === 0 && p.flatFee === 0,
     shipping: SHIPPING_LABEL[p.shipping],
-    speed: SPEED_LABEL[p.speed],
     recommended: p.name === recommendedName,
   })).sort((a, b) => {
     // Recommended first, then by net payout descending.
