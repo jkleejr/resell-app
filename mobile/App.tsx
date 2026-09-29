@@ -491,8 +491,7 @@ export default function App() {
           </View>
 
           <View style={styles.settingsSection}>
-            <Text style={styles.sectionLabel}>Marketplaces</Text>
-            <Text style={styles.hintTip}>
+            <Text style={styles.settingsIntro}>
               Select the marketplaces you want to use.
             </Text>
             <View style={styles.settingsRow}>
@@ -1190,6 +1189,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#17171C",
   },
   tagline: { color: "#A8A8B0", fontSize: 15, lineHeight: 21 },
+  // The tagline's size, in white: on Settings it's the page's only instruction.
+  settingsIntro: { color: "#fff", fontSize: 15, lineHeight: 21 },
   counterRow: {
     flexDirection: "row",
     alignItems: "center",
