@@ -10,6 +10,7 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -21,7 +22,19 @@ import * as Clipboard from "expo-clipboard";
 import { BACKEND_URL } from "./config";
 import { getDeviceId } from "./device";
 import { recordSuccessfulScan } from "./review";
-import { buildComparison, speedLabel, toPrice } from "./pricing";
+import {
+  buildComparison,
+  MARKETPLACE_NAMES,
+  marketplaceDetails,
+  speedLabel,
+  toPrice,
+} from "./pricing";
+import {
+  DEFAULT_SETTINGS,
+  loadSettings,
+  saveSettings,
+  type Settings,
+} from "./settings";
 import {
   clearHistory,
   deleteScan,
@@ -68,6 +81,7 @@ const LONG_WAIT_NOTE = "Taking longer than usual…";
 
 type CapturedImage = { uri: string; base64: string };
 type Status = "idle" | "working" | "done" | "error";
+type Screen = "home" | "settings";
 
 // Up to this many photos per scan — an overall shot plus a logo/label close-up
 // dramatically improves identification. Keep in sync with MAX_IMAGES in the
@@ -128,6 +142,8 @@ export default function App() {
   const scrollRef = useRef<ScrollView>(null);
   // The in-flight scan's request, so Cancel can abort it.
   const scanAbort = useRef<AbortController | null>(null);
+  const [screen, setScreen] = useState<Screen>("home");
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
   // Global all-time scan counter (just for fun). Best-effort; ignore failures.
   async function fetchStats() {
@@ -144,7 +160,24 @@ export default function App() {
   useEffect(() => {
     void fetchStats();
     void loadHistory().then(setHistory);
+    void loadSettings().then(setSettings);
   }, []);
+
+  function updateSettings(next: Settings) {
+    setSettings(next);
+    void saveSettings(next);
+  }
+
+  function toggleMarketplace(name: string, on: boolean) {
+    const chosen = on
+      ? [...settings.marketplaces, name]
+      : settings.marketplaces.filter((m) => m !== name);
+    // Kept in the app's order, which is also the order the backend falls back in.
+    updateSettings({
+      ...settings,
+      marketplaces: MARKETPLACE_NAMES.filter((m) => chosen.includes(m)),
+    });
+  }
 
   async function copyText(text: string, field: "title" | "listing") {
     await Clipboard.setStringAsync(text);
@@ -241,6 +274,9 @@ export default function App() {
           })),
           hint: hint.trim() || undefined,
           attempt,
+          // Where this seller sells, so the recommendation is somewhere they use.
+          marketplaces: settings.marketplaces,
+          otherMarketplaces: settings.otherMarketplaces,
         }),
       });
       if (!res.ok) {
@@ -397,7 +433,12 @@ export default function App() {
 
   const comparison =
     price && result
-      ? buildComparison(price.median, result.recommendedPlatform)
+      ? buildComparison(
+          price.median,
+          result.recommendedPlatform,
+          settings.marketplaces,
+          result.relevantPlatforms,
+        )
       : null;
 
   // The photos behind the current scan: the first one large, then a row of
@@ -425,11 +466,93 @@ export default function App() {
     </>
   );
 
+  if (screen === "settings") {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" />
+        <ScrollView contentContainerStyle={styles.container}>
+          <View style={styles.headerRow}>
+            <Text style={styles.brand}>Settings</Text>
+            <Pressable onPress={() => setScreen("home")} hitSlop={8}>
+              <Text style={styles.headerLink}>Done</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionLabel}>Marketplaces</Text>
+            <Text style={styles.hintTip}>
+              Loot Check recommends where to sell from the ones you turn on.
+            </Text>
+            {MARKETPLACE_NAMES.map((name) => {
+              const details = marketplaceDetails(name);
+              const on = settings.marketplaces.includes(name);
+              // At least one listed marketplace stays on: a recommendation
+              // needs somewhere to point.
+              const last = on && settings.marketplaces.length === 1;
+              return (
+                <View key={name} style={styles.settingsRow}>
+                  <View style={styles.rowLeft}>
+                    <Text style={styles.rowName}>{name}</Text>
+                    {details && (
+                      <Text style={styles.rowMeta}>
+                        <Text style={details.feeFree ? null : styles.rowFee}>
+                          {details.feeNote}
+                        </Text>
+                        {", "}
+                        {details.shipping}
+                      </Text>
+                    )}
+                  </View>
+                  <Switch
+                    value={on}
+                    disabled={last}
+                    onValueChange={(v) => toggleMarketplace(name, v)}
+                    trackColor={{ true: "#4ADE80" }}
+                    accessibilityLabel={name}
+                  />
+                </View>
+              );
+            })}
+            <View style={styles.settingsRow}>
+              <View style={styles.rowLeft}>
+                <Text style={styles.rowName}>Other marketplaces</Text>
+                <Text style={styles.rowMeta}>
+                  Let Loot Check suggest sites not listed here.
+                </Text>
+              </View>
+              <Switch
+                value={settings.otherMarketplaces}
+                onValueChange={(v) =>
+                  updateSettings({ ...settings, otherMarketplaces: v })
+                }
+                trackColor={{ true: "#4ADE80" }}
+                accessibilityLabel="Other marketplaces"
+              />
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
-        <Text style={styles.brand}>Loot Check</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.brand}>Loot Check</Text>
+          {/* Settings from the home screen only, never mid-scan. */}
+          {status === "idle" && images.length === 0 && (
+            <Pressable
+              onPress={() => setScreen("settings")}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+            >
+              <Ionicons name="settings-outline" size={26} color="#A8A8B0" />
+            </Pressable>
+          )}
+        </View>
         {/* The pitch is for the start screens only. Once a scan is under way
             or showing, the photo and result should sit right under the name. */}
         {status !== "working" && status !== "done" && (
@@ -693,8 +816,8 @@ export default function App() {
                         <Text style={row.feeFree ? null : styles.rowFee}>
                           {row.feeNote}
                         </Text>
-                        {", "}
-                        {row.shipping}
+                        {/* An "other" marketplace has no shipping detail. */}
+                        {row.shipping ? `, ${row.shipping}` : ""}
                       </Text>
                     </View>
                     <Text style={styles.rowNet}>${row.net}</Text>
@@ -1041,6 +1164,21 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0E0E10" },
   container: { padding: 24, paddingTop: 32, gap: 16, flexGrow: 1 },
   brand: { color: "#fff", fontSize: 40, fontWeight: "800", letterSpacing: -1 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerLink: { color: "#A8A8B0", fontSize: 17, fontWeight: "600" },
+  settingsSection: { gap: 12, marginTop: 8 },
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "#17171C",
+  },
   tagline: { color: "#A8A8B0", fontSize: 15, lineHeight: 21 },
   counterRow: {
     flexDirection: "row",

@@ -12,6 +12,9 @@ export type AnalyzeResult = {
   recommendedPlatform: string;
   recommendationReason: string;
   expectedSpeed: "fast" | "moderate" | "slow";
+  // The marketplaces worth listing this item on, best first. Missing from
+  // older backends and from scans saved before it existed.
+  relevantPlatforms?: string[];
   // Added after 1.0.2 shipped. Optional so a build running against an older
   // backend deploy just falls back to the resale wording.
   valuationBasis?: "resale" | "original";
