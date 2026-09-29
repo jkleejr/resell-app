@@ -51,7 +51,7 @@ export const MARKETPLACE_NAMES: string[] = PLATFORMS.map((p) => p.name);
 
 const SHIPPING_LABEL: Record<Shipping, string> = {
   local: "Local",
-  prepaid: "Prepaid label",
+  prepaid: "Ship",
 };
 
 export type ComparisonRow = {

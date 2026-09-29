@@ -172,11 +172,23 @@ export default function App() {
     const chosen = on
       ? [...settings.marketplaces, name]
       : settings.marketplaces.filter((m) => m !== name);
-    // Kept in the app's order, which is also the order the backend falls back in.
     updateSettings({
-      ...settings,
+      // Turning one off means the seller is choosing for themselves now, so
+      // "Loot Check decides" goes off with it.
+      otherMarketplaces: on && settings.otherMarketplaces,
+      // Kept in the app's order, which is also the order the backend falls back in.
       marketplaces: MARKETPLACE_NAMES.filter((m) => chosen.includes(m)),
     });
+  }
+
+  // "Loot Check decides": on means every marketplace, and the AI free to pick
+  // any other site too. Off leaves the marketplaces as they are.
+  function toggleLootCheckDecides(on: boolean) {
+    updateSettings(
+      on
+        ? { marketplaces: MARKETPLACE_NAMES, otherMarketplaces: true }
+        : { ...settings, otherMarketplaces: false },
+    );
   }
 
   async function copyText(text: string, field: "title" | "listing") {
@@ -481,8 +493,22 @@ export default function App() {
           <View style={styles.settingsSection}>
             <Text style={styles.sectionLabel}>Marketplaces</Text>
             <Text style={styles.hintTip}>
-              Loot Check recommends where to sell from the ones you turn on.
+              Select the marketplaces you want to use.
             </Text>
+            <View style={styles.settingsRow}>
+              <View style={styles.rowLeft}>
+                <Text style={styles.rowName}>Loot Check decides</Text>
+                <Text style={styles.rowMeta}>
+                  Let AI search all marketplaces
+                </Text>
+              </View>
+              <Switch
+                value={settings.otherMarketplaces}
+                onValueChange={toggleLootCheckDecides}
+                trackColor={{ true: "#4ADE80" }}
+                accessibilityLabel="Loot Check decides"
+              />
+            </View>
             {MARKETPLACE_NAMES.map((name) => {
               const details = marketplaceDetails(name);
               const on = settings.marketplaces.includes(name);
@@ -513,22 +539,6 @@ export default function App() {
                 </View>
               );
             })}
-            <View style={styles.settingsRow}>
-              <View style={styles.rowLeft}>
-                <Text style={styles.rowName}>Other marketplaces</Text>
-                <Text style={styles.rowMeta}>
-                  Let Loot Check suggest sites not listed here.
-                </Text>
-              </View>
-              <Switch
-                value={settings.otherMarketplaces}
-                onValueChange={(v) =>
-                  updateSettings({ ...settings, otherMarketplaces: v })
-                }
-                trackColor={{ true: "#4ADE80" }}
-                accessibilityLabel="Other marketplaces"
-              />
-            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
