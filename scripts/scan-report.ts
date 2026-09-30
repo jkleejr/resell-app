@@ -4,6 +4,7 @@
 //   npm run report                # everything recorded so far
 //   npm run report -- --days 7    # only the last 7 days
 //   npm run report -- --json      # the raw summary, for a spreadsheet or script
+//   npm run report -- --scans 20  # also list the 20 most recent scans, one per line
 //
 // Needs the PRODUCTION Upstash creds in .env (UPSTASH_REDIS_REST_URL and
 // UPSTASH_REDIS_REST_TOKEN) — it reads the same database the live app writes
@@ -13,12 +14,15 @@
 // ever counted, so they show up in the all-time total and nowhere else.
 import { readScanEvents } from "../lib/scanlog.js";
 import { summarize, type Spread } from "../lib/scanstats.js";
+import type { ScanEvent } from "../lib/scanlog.js";
 import { getTotalScans } from "../lib/usage.js";
 
 const args = process.argv.slice(2);
 const asJson = args.includes("--json");
 const daysAt = args.indexOf("--days");
 const days = daysAt >= 0 ? Number(args[daysAt + 1]) : null;
+const scansAt = args.indexOf("--scans");
+const listScans = scansAt >= 0 ? Number(args[scansAt + 1]) || 20 : 0;
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 const secs = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toFixed(1)}s`);
@@ -39,6 +43,31 @@ function breakdown(counts: Record<string, number>): void {
   if (sorted.length === 0) row("(none yet)", "");
   for (const [name, n] of sorted) {
     row(name.replace(/_/g, " "), `${String(n).padStart(5)}   ${pct(n / total)}`);
+  }
+}
+
+// One line per scan, newest last, in this Mac's local time. Everything here is
+// already in the anonymous log: no device, no photo, no item name.
+function recentScans(events: ScanEvent[], n: number): void {
+  heading(`Recent scans (last ${n}, local time)`);
+  const recent = [...events].sort((a, b) => a.ts - b.ts).slice(-n);
+  if (recent.length === 0) row("(none yet)", "");
+  for (const e of recent) {
+    const when = new Date(e.ts).toLocaleString("en-US", {
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    });
+    const model = (e.model ?? "—").replace(/^claude-/, "");
+    const cost = e.costUSD !== undefined ? `$${e.costUSD.toFixed(4)}` : "—";
+    const what = e.outcome === "refused"
+      ? `refused (${e.refusalCategory ?? "none"})`
+      : e.outcome === "ok"
+        ? `${e.basis ?? ""} ${e.category ?? ""}`.trim()
+        : "";
+    console.log(
+      `  ${when.padEnd(20)} ${e.outcome.padEnd(8)} ${model.padEnd(16)} ` +
+        `${secs(e.totalMs).padStart(6)}  ${cost.padStart(8)}  ` +
+        `search: ${(e.verify ?? "—").replace(/_/g, " ").padEnd(13)} ${what}`,
+    );
   }
 }
 
@@ -86,6 +115,16 @@ async function main(): Promise<void> {
   }
   row("Server had to retry the AI call", s.serverRetries);
 
+  heading("By AI model");
+  const models = Object.entries(s.byModel).sort((a, b) => b[1].scans - a[1].scans);
+  if (models.length === 0) row("(none yet)", "");
+  for (const [model, m] of models) {
+    console.log(`  ${model}`);
+    row("  Scans / failure rate", `${m.scans} / ${pct(m.failureRate)}`);
+    timing("  Wait (successful scans)", m.duration);
+    row("  Cost per scan", `$${m.perScanUSD.toFixed(4)}`);
+  }
+
   heading("How long did people wait? (successful scans)");
   timing("All scans", s.duration.all);
   timing("Regular scans", s.duration.regular);
@@ -130,6 +169,8 @@ async function main(): Promise<void> {
   heading("Cost");
   row("Total AI spend on logged scans", `$${s.cost.totalUSD.toFixed(2)}`);
   row("Per scan", `$${s.cost.perScanUSD.toFixed(4)}`);
+
+  if (listScans > 0) recentScans(events, listScans);
 
   heading("Scans per day (UTC, last 14)");
   for (const [day, n] of Object.entries(s.perDay).sort().slice(-14)) {

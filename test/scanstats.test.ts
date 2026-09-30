@@ -56,6 +56,29 @@ test("counts outcomes, and the failure rate ignores scans blocked by the cap", (
   assert.deepEqual(s.refusals, { general_harms: 1 });
 });
 
+test("compares AI models side by side, leaving out scans that never reached one", () => {
+  const s = summarize([
+    ok({ model: "claude-sonnet-4-6", totalMs: 8000, costUSD: 0.02 }),
+    ok({ model: "claude-sonnet-4-6", totalMs: 7000, costUSD: 0.03 }),
+    ok({ model: "claude-sonnet-5-5", totalMs: 4000, costUSD: 0.02 }),
+    { ts: DAY1, outcome: "refused", totalMs: 3000, photos: 1, hint: false, model: "claude-sonnet-5-5", costUSD: 0.01, refusalCategory: "general_harms" },
+    { ts: DAY1, outcome: "capped", totalMs: 40, photos: 1, hint: false, scanOfDay: 101 },
+  ]);
+  assert.deepEqual(Object.keys(s.byModel).sort(), ["claude-sonnet-4-6", "claude-sonnet-5-5"]);
+  const old = s.byModel["claude-sonnet-4-6"]!;
+  assert.equal(old.scans, 2);
+  assert.equal(old.failureRate, 0);
+  assert.equal(old.duration.median, 7500);
+  assert.equal(old.perScanUSD, 0.025);
+  const now = s.byModel["claude-sonnet-5-5"]!;
+  assert.equal(now.scans, 2);
+  assert.equal(now.failed, 1);
+  assert.equal(now.failureRate, 0.5);
+  // Wait time counts successful scans only.
+  assert.equal(now.duration.count, 1);
+  assert.equal(now.duration.median, 4000);
+});
+
 test("splits scan time into regular scans and scans that ran a web search", () => {
   const s = summarize([
     ok({ totalMs: 5000 }),

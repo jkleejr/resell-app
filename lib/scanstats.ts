@@ -53,6 +53,21 @@ export interface ScanSummary {
   serverRetries: number;
   /** Scans per UTC day, keyed YYYY-MM-DD. */
   perDay: Record<string, number>;
+  /**
+   * The same numbers per AI model, so a model switch can be compared side by
+   * side. Only scans that reached the model; capped ones never did.
+   */
+  byModel: Record<string, ModelStats>;
+}
+
+export interface ModelStats {
+  scans: number;
+  /** Timeouts, errors, and refusals. */
+  failed: number;
+  failureRate: number;
+  /** Successful scans only, as the user waited for them (ms). */
+  duration: Spread;
+  perScanUSD: number;
 }
 
 function tally<T>(items: T[], key: (item: T) => string | undefined) {
@@ -83,6 +98,30 @@ function spread(values: number[]): Spread {
 }
 
 const share = (n: number, of: number) => (of ? n / of : 0);
+
+const FAILED: ReadonlySet<ScanEvent["outcome"]> = new Set(["timeout", "error", "refused"]);
+
+function byModel(events: ScanEvent[]): Record<string, ModelStats> {
+  const groups = new Map<string, ScanEvent[]>();
+  for (const e of events) {
+    if (!e.model) continue;
+    groups.set(e.model, [...(groups.get(e.model) ?? []), e]);
+  }
+  const out: Record<string, ModelStats> = {};
+  for (const [model, list] of groups) {
+    const failed = list.filter((e) => FAILED.has(e.outcome)).length;
+    const cost = list.reduce((sum, e) => sum + (e.costUSD ?? 0), 0);
+    const paid = list.filter((e) => e.costUSD !== undefined).length;
+    out[model] = {
+      scans: list.length,
+      failed,
+      failureRate: share(failed, list.length),
+      duration: spread(list.filter((e) => e.outcome === "ok").map((e) => e.totalMs)),
+      perScanUSD: round(share(cost, paid), 4),
+    };
+  }
+  return out;
+}
 const round = (n: number, places: number) =>
   Math.round(n * 10 ** places) / 10 ** places;
 
@@ -173,6 +212,7 @@ export function summarize(events: ScanEvent[]): ScanSummary {
     hintShare: share(events.filter((e) => e.hint).length, events.length),
     attempts: tally(events, (e) => e.attempt ?? "unlabelled"),
     serverRetries: events.filter((e) => e.retried).length,
+    byModel: byModel(events),
     perDay: tally(events, (e) => new Date(e.ts).toISOString().slice(0, 10)),
   };
 }
