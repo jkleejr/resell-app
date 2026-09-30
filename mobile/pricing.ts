@@ -49,6 +49,20 @@ const PLATFORMS: Platform[] = [
 /** Every marketplace the app knows the fees of, in display order. */
 export const MARKETPLACE_NAMES: string[] = PLATFORMS.map((p) => p.name);
 
+// Sites the seller can't pick in Settings, but that the AI suggests when it
+// is allowed to choose, and whose fees are known. Their rows show a real
+// payout instead of "Fees vary". Matched by name, ignoring case.
+//
+// Reverb (US): 5% selling fee + 3.19% + $0.49 payment processing.
+const KNOWN_OTHER_SITES: Platform[] = [
+  { name: "Reverb", feePct: 0.0819, flatFee: 0.49, shipping: "prepaid" },
+];
+
+function knownOtherSite(name: string): Platform | undefined {
+  const n = name.trim().toLowerCase();
+  return KNOWN_OTHER_SITES.find((p) => p.name.toLowerCase() === n);
+}
+
 const SHIPPING_LABEL: Record<Shipping, string> = {
   local: "Local",
   prepaid: "Ship",
@@ -93,10 +107,11 @@ function netPayout(anchor: number, p: Platform): number {
   return Math.max(0, Math.round(anchor - fee));
 }
 
-// "9.5% + $0.45", "12% (min $5)", "No seller fee".
+// "9.5% + $0.45", "8.19% + $0.49", "12% (min $5)", "No seller fee".
 function feeNote(p: Platform): string {
   if (p.feePct === 0 && p.flatFee === 0) return "No seller fee";
-  const pct = `${Number((p.feePct * 100).toFixed(1))}%`;
+  // Two decimals at most, and only as many as the fee has: 13%, 9.5%, 8.19%.
+  const pct = `${Number((p.feePct * 100).toFixed(2))}%`;
   const flat = p.flatFee ? ` + $${p.flatFee.toFixed(2)}` : "";
   const min = p.minFee ? ` (min $${p.minFee})` : "";
   return pct + flat + min;
@@ -147,7 +162,7 @@ export function buildComparison(
   relevant?: readonly string[],
 ): ComparisonRow[] {
   const row = (name: string): ComparisonRow => {
-    const p = PLATFORMS.find((x) => x.name === name);
+    const p = PLATFORMS.find((x) => x.name === name) ?? knownOtherSite(name);
     return p
       ? {
           name,
