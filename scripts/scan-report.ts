@@ -12,7 +12,7 @@
 //
 // The log starts on the day this shipped. Scans from before then were only
 // ever counted, so they show up in the all-time total and nowhere else.
-import { readScanEvents } from "../lib/scanlog.js";
+import { readScanEvents, startOfUTCDay } from "../lib/scanlog.js";
 import { summarize, type Spread } from "../lib/scanstats.js";
 import type { ScanEvent } from "../lib/scanlog.js";
 import { getTotalScans } from "../lib/usage.js";
@@ -46,16 +46,15 @@ function breakdown(counts: Record<string, number>): void {
   }
 }
 
-// One line per scan, newest last, in this Mac's local time. Everything here is
-// already in the anonymous log: no device, no photo, no item name.
+// One line per scan, newest last, dated by UTC day — the log keeps no time of
+// day. Everything here is already in the anonymous log: no device, no photo, no
+// item name. The log is in write order, so it is not re-sorted.
 function recentScans(events: ScanEvent[], n: number): void {
-  heading(`Recent scans (last ${n}, local time)`);
-  const recent = [...events].sort((a, b) => a.ts - b.ts).slice(-n);
+  heading(`Recent scans (last ${n}, UTC date)`);
+  const recent = events.slice(-n);
   if (recent.length === 0) row("(none yet)", "");
   for (const e of recent) {
-    const when = new Date(e.ts).toLocaleString("en-US", {
-      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-    });
+    const when = date(e.ts);
     const model = (e.model ?? "—").replace(/^claude-/, "");
     const cost = e.costUSD !== undefined ? `$${e.costUSD.toFixed(4)}` : "—";
     const what = e.outcome === "refused"
@@ -86,7 +85,8 @@ async function main(): Promise<void> {
 
   let events = await readScanEvents();
   if (days !== null && Number.isFinite(days)) {
-    const since = Date.now() - days * 86_400_000;
+    // Whole UTC days, since records only carry the day: --days 1 is today.
+    const since = startOfUTCDay(Date.now()) - (days - 1) * 86_400_000;
     events = events.filter((e) => e.ts >= since);
   }
   const s = summarize(events);

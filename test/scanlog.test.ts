@@ -10,6 +10,7 @@ const HINT = "SECRETHINT my grandma gave me this";
 let fake: FakeServices;
 let handleAnalyzeRequest: typeof import("../lib/handler.js").handleAnalyzeRequest;
 let readScanEvents: typeof import("../lib/scanlog.js").readScanEvents;
+let startOfUTCDay: typeof import("../lib/scanlog.js").startOfUTCDay;
 
 before(async () => {
   fake = await startFakeServices();
@@ -20,7 +21,7 @@ before(async () => {
   process.env.ANTHROPIC_API_KEY = "fake-key";
   process.env.ANALYZE_TIMEOUT_MS = "400";
   ({ handleAnalyzeRequest } = await import("../lib/handler.js"));
-  ({ readScanEvents } = await import("../lib/scanlog.js"));
+  ({ readScanEvents, startOfUTCDay } = await import("../lib/scanlog.js"));
 });
 
 after(() => fake.close());
@@ -53,7 +54,9 @@ test("a successful scan is remembered as one anonymous record of what happened",
   const e = events[0]!;
 
   assert.equal(e.outcome, "ok");
-  assert.ok(e.ts >= before && e.ts <= Date.now());
+  // The date only: midnight UTC of the scan's day, never the time of day.
+  assert.equal(e.ts, startOfUTCDay(before));
+  assert.equal(e.ts % 86_400_000, 0);
   assert.equal(e.photos, 2);
   assert.equal(e.hint, true);
   assert.equal(e.category, "clothing");

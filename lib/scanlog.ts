@@ -71,7 +71,11 @@ export type ScanAttempt =
 export const SCAN_ATTEMPTS: readonly ScanAttempt[] = ["new", "retry", "add_photo"];
 
 export interface ScanEvent {
-  /** When the record was written (epoch ms). */
+  /**
+   * The UTC day of the scan, as epoch ms at 00:00 UTC — the date only, never
+   * the time of day. (Records written before this change hold the exact time;
+   * readers only ever look at the day.)
+   */
   ts: number;
   /**
    * "capped" = blocked by a daily limit before any model call.
@@ -148,10 +152,17 @@ function enabled(): boolean {
   return process.env.SCAN_LOG !== "off" && configured();
 }
 
+const DAY_MS = 86_400_000;
+
+/** Midnight UTC of the day `ms` falls in — the same day `scanOfDay` counts in. */
+export function startOfUTCDay(ms: number): number {
+  return ms - (ms % DAY_MS);
+}
+
 export async function recordScan(event: Omit<ScanEvent, "ts">): Promise<void> {
   if (!enabled()) return;
   try {
-    const record: ScanEvent = { ts: Date.now(), ...event };
+    const record: ScanEvent = { ts: startOfUTCDay(Date.now()), ...event };
     await pipeline([["RPUSH", KEY, JSON.stringify(record)]], WRITE_TIMEOUT_MS);
   } catch (err) {
     // pipeline() already swallows its own failures; this is for anything else.
