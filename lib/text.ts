@@ -92,7 +92,7 @@ const HEDGE_PATTERNS: RegExp[] = [
   // reasoning, not a fact about the item, and the prompt's ban alone kept
   // letting it through.
   /\b(?:identifiable|recogni[sz]able|distinguishable) (?:by|from|as)\b/i,
-  /\bconsistent with (?:normal|regular|light|typical|everyday|moderate) (?:use|wear)\b/i,
+  /\bconsistent with\b[^.!?]*\b(?:use|wear|age)\b/i,
   // Reporting the absence of flaws: "shows no visible wear", "no signs of
   // damage". General condition, which the prompt keeps out of the copy; a
   // real flaw is disclosed on its own. "No band included" does not match.
@@ -100,7 +100,7 @@ const HEDGE_PATTERNS: RegExp[] = [
   // General wear, which the prompt also keeps out: "shows general use wear",
   // "light signs of wear". A specific flaw ("One knob cap is missing.") is its
   // own sentence and does not match.
-  /\b(?:general|normal|light|minor|typical|everyday|some) (?:use |signs of )?wear\b/i,
+  /\b(?:general|normal|light|minor|typical|everyday|some|surface) (?:use |signs of )?wear\b/i,
 ];
 
 /**
