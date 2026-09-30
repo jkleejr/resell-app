@@ -843,7 +843,11 @@ export default function App() {
                         {row.shipping ? `, ${row.shipping}` : ""}
                       </Text>
                     </View>
-                    <Text style={styles.rowNet}>${row.net}</Text>
+                    <Text style={styles.rowNet}>
+                      {row.netRange
+                        ? `$${row.netRange[0]}–$${row.netRange[1]}`
+                        : `$${row.net}`}
+                    </Text>
                   </View>
                 ))}
                 <Text style={styles.netNote}>

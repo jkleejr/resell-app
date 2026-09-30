@@ -2,7 +2,7 @@
 // stand-ins for Upstash and Anthropic (see fake-services.ts). Run: npm test
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
-import { startFakeServices, ORIGINAL_ITEM, type FakeServices } from "./fake-services.js";
+import { startFakeServices, ORIGINAL_ITEM, RESALE_ITEM, type FakeServices } from "./fake-services.js";
 
 const DEVICE = "DEVICE-ABC-123";
 const HINT = "SECRETHINT my grandma gave me this";
@@ -183,6 +183,27 @@ test("a web search skipped because the device's allowance is spent is recorded a
 
   const [e] = await readScanEvents();
   assert.equal(e!.verify, "no_allowance");
+});
+
+test("an antique or collectible worth $40 or more gets a price check", async () => {
+  process.env.PRICE_VERIFY = "on";
+  fake.visionItem = { ...RESALE_ITEM, category: "collectible", estimatedValueUSD: { low: 40, high: 80 } };
+
+  await scan();
+
+  const [e] = await readScanEvents();
+  assert.equal(e!.verify, "verified");
+});
+
+test("a collectible under $40, or used clothing, is priced without a search", async () => {
+  process.env.PRICE_VERIFY = "on";
+  fake.visionItem = { ...RESALE_ITEM, category: "collectible", estimatedValueUSD: { low: 10, high: 30 } };
+  await scan();
+  fake.visionItem = { ...RESALE_ITEM, estimatedValueUSD: { low: 60, high: 120 } };
+  await scan();
+
+  const events = await readScanEvents();
+  assert.deepEqual(events.map((e) => e.verify), ["not_eligible", "not_eligible"]);
 });
 
 test("a scan that fails is recorded as an error with no item details", async () => {

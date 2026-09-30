@@ -108,7 +108,9 @@ const RESALE_TASK = `Search ONCE for what this item has actually SOLD for recent
 
 You want completed or sold prices from private sellers. Active listings are NOT evidence here: a marketplace is full of hopeful prices that never found a buyer, and this item has a real going rate that asking prices sit above. If the search returns only active listings and no sold data, that is evidence "none" — say so and keep the existing estimate.
 
-Ignore new and retail prices entirely. What a product costs new tells you almost nothing about what a used one fetches.`;
+Ignore new and retail prices entirely. What a product costs new tells you almost nothing about what a used one fetches.
+
+For antiques and collectibles, WorthPoint records what comparable pieces actually sold for, and eBay's sold listings do the same; both are sold data.`;
 
 const ORIGINAL_TASK = `This is a one-of-a-kind piece made by the person selling it. It has never been sold, so there is no sale history to find and you should not look for one.
 

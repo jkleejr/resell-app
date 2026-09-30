@@ -86,6 +86,7 @@ export const PLATFORM_NAMES = [
   "Depop",
   "Vinted",
   "StockX",
+  "The RealReal",
   "Reverb",
 ] as const;
 

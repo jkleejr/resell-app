@@ -31,6 +31,11 @@ type Platform = {
    * the rate at `price` and up). Picked by the item's estimated value.
    */
   below?: { price: number; feePct: number; flatFee: number; minFee?: number };
+  /**
+   * The top of the fee when the marketplace sets it per item (a consignment
+   * cut): the fee runs from `feePct` up to this, and the payout is a range.
+   */
+  maxFeePct?: number;
 };
 
 // The rate that applies at this price: the lower tier when the item is priced
@@ -51,6 +56,8 @@ function rateAt(p: Platform, price: number): Platform {
 // StockX: 12% base total (9% transaction at seller level 1 + 3% processing).
 // Reverb (US): 5% selling fee + 3.19% + $0.49 payment processing.
 // Depop (US): no selling fee; 3.3% + $0.45 payment processing.
+// The RealReal: a consignment commission of 10% to 80% of the selling price,
+// set per item by category and price.
 const PLATFORMS: Platform[] = [
   { name: "Facebook Marketplace", feePct: 0.0, flatFee: 0, shipping: "local" },
   { name: "eBay", feePct: 0.13, flatFee: 0.35, shipping: "prepaid" },
@@ -61,6 +68,7 @@ const PLATFORMS: Platform[] = [
   { name: "Depop", feePct: 0.033, flatFee: 0.45, shipping: "prepaid" },
   { name: "Vinted", feePct: 0.0, flatFee: 0, shipping: "prepaid" },
   { name: "StockX", feePct: 0.12, flatFee: 0, shipping: "prepaid" },
+  { name: "The RealReal", feePct: 0.1, flatFee: 0, maxFeePct: 0.8, shipping: "prepaid" },
   { name: "Reverb", feePct: 0.0819, flatFee: 0.49, shipping: "prepaid" },
 ];
 
@@ -122,7 +130,10 @@ function otherShipping(name: string): string {
 
 export type ComparisonRow = {
   name: string;
+  /** The payout; the middle of `netRange` when there is one. */
   net: number;
+  /** Lowest and highest payout, when the fee is a range. */
+  netRange?: [number, number];
   feeNote: string;
   /** No seller fee: shown in grey. Any fee, known or not, is shown in red. */
   feeFree: boolean;
@@ -132,16 +143,21 @@ export type ComparisonRow = {
 };
 
 // net = anchor - max(anchor * feePct + flatFee, minFee), floored at 0.
-function netPayout(anchor: number, p: Platform): number {
-  const fee = Math.max(anchor * p.feePct + p.flatFee, p.minFee ?? 0);
+function netPayout(anchor: number, p: Platform, feePct = p.feePct): number {
+  const fee = Math.max(anchor * feePct + p.flatFee, p.minFee ?? 0);
   return Math.max(0, Math.round(anchor - fee));
 }
 
-// "9.5% + $0.45", "8.19% + $0.49", "12% (min $5)", "No seller fee".
+// Two decimals at most, and only as many as the fee has: 13%, 9.5%, 8.19%.
+const percent = (fraction: number) => `${Number((fraction * 100).toFixed(2))}%`;
+
+// "9.5% + $0.45", "8.19% + $0.49", "6% (min $1.99)", "10–80%", "No seller fee".
 function feeNote(p: Platform): string {
+  if (p.maxFeePct !== undefined) {
+    return `${Number((p.feePct * 100).toFixed(2))}–${percent(p.maxFeePct)}`;
+  }
   if (p.feePct === 0 && p.flatFee === 0) return "No seller fee";
-  // Two decimals at most, and only as many as the fee has: 13%, 9.5%, 8.19%.
-  const pct = `${Number((p.feePct * 100).toFixed(2))}%`;
+  const pct = percent(p.feePct);
   const flat = p.flatFee ? ` + $${p.flatFee.toFixed(2)}` : "";
   const min = p.minFee ? ` (min $${p.minFee})` : "";
   return pct + flat + min;
@@ -195,10 +211,16 @@ export function buildComparison(
     const known = PLATFORMS.find((x) => x.name === name) ?? knownOtherSite(name);
     // Tiered marketplaces (Grailed) charge by the item's price.
     const p = known ? rateAt(known, anchor) : undefined;
+    // Least and most the seller could keep, when the fee is set per item.
+    const range: [number, number] | undefined =
+      p?.maxFeePct !== undefined
+        ? [netPayout(anchor, p, p.maxFeePct), netPayout(anchor, p)]
+        : undefined;
     return p
       ? {
           name,
-          net: netPayout(anchor, p),
+          net: range ? Math.round((range[0] + range[1]) / 2) : netPayout(anchor, p),
+          netRange: range,
           feeNote: feeNote(p),
           feeFree: p.feePct === 0 && p.flatFee === 0,
           shipping: SHIPPING_LABEL[p.shipping],
@@ -253,6 +275,7 @@ const MARKETPLACE_URLS: Record<string, string> = {
   Etsy: "https://www.etsy.com/your/shops/me/listing-editor/create",
   StockX: "https://stockx.com/sell",
   Reverb: "https://reverb.com/sell",
+  "The RealReal": "https://www.therealreal.com/sell-trr",
 };
 
 export function marketplaceUrl(name: string): string {

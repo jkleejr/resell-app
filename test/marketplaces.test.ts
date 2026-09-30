@@ -83,6 +83,13 @@ test("Reverb is a listed marketplace: kept when the seller uses it, spelled the 
   assert.equal(off.recommendedPlatform, "eBay");
 });
 
+test("The RealReal is a listed marketplace: kept when the seller uses it, spelled the app's way", async () => {
+  const kept = await scanPicking("the realreal", { marketplaces: ["eBay", "The RealReal"] });
+  assert.equal(kept.recommendedPlatform, "The RealReal");
+  const off = await scanPicking("The RealReal", { marketplaces: ["eBay"] });
+  assert.equal(off.recommendedPlatform, "eBay");
+});
+
 test("unknown names in the seller's list are ignored", async () => {
   const body = await scanPicking("Poshmark", { marketplaces: ["Nope", "StockX"] });
   assert.equal(body.recommendedPlatform, "StockX");
@@ -130,7 +137,7 @@ test("other sites are listed only when the seller allows them", async () => {
 });
 
 test("the list holds at most seven marketplaces, each once", async () => {
-  const all = ["Facebook Marketplace", "OfferUp", "Vinted", "Depop", "Mercari", "eBay", "Poshmark", "Etsy", "StockX", "Reverb"];
+  const all = ["Facebook Marketplace", "OfferUp", "Vinted", "Depop", "Mercari", "eBay", "Poshmark", "Etsy", "StockX", "The RealReal", "Reverb"];
   const list = await relevantFor("eBay", ["eBay", "eBay", ...all], { marketplaces: all });
   assert.equal(list.length, 7);
   assert.equal(new Set(list).size, 7);

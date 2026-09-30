@@ -238,8 +238,8 @@ const MIN_VERIFY_MS = 8_000;
 /**
  * Decide whether one web search is worth a cent for this item.
  *
- * Originals only — and the reason is about what the web can actually tell us,
- * not about how confident the model feels.
+ * Originals, and antiques and collectibles — and the reason is about what the
+ * web can actually tell us, not about how confident the model feels.
  *
  * A live run made this concrete. Searching a used pair of Levi's returned only
  * active listings and no sold data, and the model correctly refused to price
@@ -255,6 +255,11 @@ const MIN_VERIFY_MS = 8_000;
  * model has no memorised market for a hand-thrown mug or a stranger's painting
  * either, so this is also where its own knowledge is thinnest.
  *
+ * Antiques and collectibles are the used goods where sold data IS on the open
+ * web: WorthPoint's pages each record what one piece sold for, and they are in
+ * the resale search's allowed domains. The model's own market for them is thin,
+ * too — a figurine or a coin has no deep, stable going rate the way jeans do.
+ *
  * `priceConfidence` used to widen this gate to anything the model flagged as a
  * guess. That is what pulled the jeans in. The field is still emitted and still
  * worth logging, but it no longer spends money.
@@ -262,7 +267,7 @@ const MIN_VERIFY_MS = 8_000;
 function shouldVerify(r: AnalyzeResult): boolean {
   if (process.env.PRICE_VERIFY !== "on") return false;
   if (r.estimatedValueUSD.high < VERIFY_MIN_USD) return false;
-  return r.valuationBasis === "original";
+  return r.valuationBasis === "original" || r.category === "collectible";
 }
 
 // The result to serve, plus — for the scan log — what became of the check.
