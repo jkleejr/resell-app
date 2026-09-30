@@ -318,15 +318,38 @@ async function maybeVerifyPrice(
   const outcome = await verifyPrice(result, remainingMs);
   const spent = { ms: Date.now() - verifyStartedAt, costUSD: outcome.costUSD };
   if (!outcome.price) {
-    // Nothing usable came back, so the seller sees the model's own estimate
-    // with no note under it. A search that ran and found nothing used to say
-    // "Couldn't find listings"; it no longer does, because it told the seller
-    // about our lookup rather than their item, and Sonnet 5.5 comes back empty
-    // more often than 4.6 did (it won't call a thin search a match). The log
-    // still tells the two apart. priceBasis stays "estimate" either way.
+    // Two different situations, and only one of them is ours to explain.
+    //
+    // A search that ran and found nothing to price with earns a line: the scan
+    // just took ten seconds longer than usual and the seller deserves to know
+    // why, without a tour of which marketplaces were tried. priceBasis stays
+    // "estimate" because the number is still the model's own.
+    //
+    // A search that never ran — it timed out, threw, or was never issued —
+    // earns silence. "Couldn't find listings" would be the app describing an
+    // outcome it never reached.
+    return outcome.searched
+      ? {
+          result: { ...result, priceNote: "Couldn't find listings" },
+          status: "no_listings",
+          ...spent,
+        }
+      : { result, status: "not_searched", ...spent };
+  }
+
+  // A few listings helped: they move the price, and the note says how thin
+  // the basis is ("Based on a few listings from Etsy"). priceBasis stays
+  // "estimate", so the app shows the note in grey with no tick and no
+  // "very certain" badge; those are for a search that found enough.
+  if (outcome.price.strength === "a_few") {
+    const { low, high, note } = outcome.price;
     return {
-      result,
-      status: outcome.searched ? "no_listings" : "not_searched",
+      result: {
+        ...result,
+        estimatedValueUSD: { low, high },
+        priceNote: note,
+      },
+      status: "few_listings",
       ...spent,
     };
   }

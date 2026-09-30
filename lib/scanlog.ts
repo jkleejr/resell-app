@@ -50,6 +50,8 @@ export type VerifyStatus =
   | "not_searched"
   /** Searched, and the findings were not good enough to replace the estimate. */
   | "no_listings"
+  /** Searched, and a few listings moved the price; shown without the tick. */
+  | "few_listings"
   /** Searched, and the price shown is the verified one. */
   | "verified";
 

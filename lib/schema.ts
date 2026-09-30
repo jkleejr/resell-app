@@ -43,6 +43,10 @@ export const PRICE_CONFIDENCE = ["high", "low"] as const;
 // Whether the listings a price search found were for this exact item, or only
 // for comparable ones. Decides the wording of the note under the price.
 export const LISTING_MATCH = ["exact", "similar"] as const;
+// How much the price check's search turned up: no usable prices, a few that
+// help, or enough to stand behind. Only "enough" earns the green tick; "a_few"
+// still moves the range, under a plainer note.
+export const VERIFY_EVIDENCE = ["none", "a_few", "enough"] as const;
 
 // Where the price we return actually came from. Set by the SERVER, never by the
 // model: "verified" only after lib/verify.ts successfully refined the range.
@@ -160,8 +164,10 @@ export interface AnalyzeResult {
 export interface VerifiedPrice {
   low: number;
   high: number;
-  /** Short, user-facing provenance line, e.g. "3 recent sold listings, $32-41". */
+  /** Short, user-facing provenance line, e.g. "Based on Etsy listings". */
   note: string;
+  /** "enough" is shown as verified; "a_few" moves the price without the tick. */
+  strength: "enough" | "a_few";
 }
 
 /**
@@ -192,9 +198,9 @@ export const VERIFY_SCHEMA = {
     findings: { type: "string" },
     // Right after findings, so it is judged from what the search showed.
     match: { type: "string", enum: [...LISTING_MATCH] },
-    // "low" tells us to DISCARD the result and keep the model's own estimate —
+    // "none" tells us to DISCARD the result and keep the model's own estimate —
     // a bad comp is worse than an honest guess.
-    confidence: { type: "string", enum: [...PRICE_CONFIDENCE] },
+    evidence: { type: "string", enum: [...VERIFY_EVIDENCE] },
     rangeUSD: {
       type: "object",
       additionalProperties: false,
@@ -205,8 +211,11 @@ export const VERIFY_SCHEMA = {
       required: ["low", "high"],
     },
     note: { type: "string" },
+    // The one marketplace most of the prices came from, or "". The app words
+    // the "a few listings" note itself, so this is a name, not a sentence.
+    source: { type: "string" },
   },
-  required: ["findings", "match", "confidence", "rangeUSD", "note"],
+  required: ["findings", "match", "evidence", "rangeUSD", "note", "source"],
 } as const;
 
 // JSON Schema passed to the model. Structured outputs require

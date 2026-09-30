@@ -99,9 +99,10 @@ export async function startFakeServices(): Promise<FakeServices> {
       fake.verifyReply = {
         findings: "Comparable originals ask $90-150.",
         match: "similar",
-        confidence: "high",
+        evidence: "enough",
         rangeUSD: { low: 90, high: 150 },
         note: "Based on Etsy listings",
+        source: "Etsy",
       };
       fake.upstashDown = false;
       fake.rpushDelayMs = 0;

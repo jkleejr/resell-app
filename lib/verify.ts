@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  PRICE_CONFIDENCE,
+  VERIFY_EVIDENCE,
   VERIFY_SCHEMA,
   type AnalyzeResult,
   type VerifiedPrice,
@@ -106,7 +106,7 @@ const SANITY_FACTOR = 3;
 // question is what comparable makers ask. That is exactly what listings show.
 const RESALE_TASK = `Search ONCE for what this item has actually SOLD for recently on the secondhand market.
 
-You want completed or sold prices from private sellers. Active listings are NOT evidence here: a marketplace is full of hopeful prices that never found a buyer, and this item has a real going rate that asking prices sit above. If the search returns only active listings and no sold data, that is a "low" confidence result — say so and keep the existing estimate.
+You want completed or sold prices from private sellers. Active listings are NOT evidence here: a marketplace is full of hopeful prices that never found a buyer, and this item has a real going rate that asking prices sit above. If the search returns only active listings and no sold data, that is evidence "none" — say so and keep the existing estimate.
 
 Ignore new and retail prices entirely. What a product costs new tells you almost nothing about what a used one fetches.`;
 
@@ -137,10 +137,15 @@ You are giving the seller an IDEA of what their piece could fetch, not an apprai
 const REPORTING_RULES = `Then report, in this order:
 - findings: what the search actually showed — the prices you saw and where. One or two sentences. If the results were thin, off-target, or about a different item, say so plainly.
 - match: "exact" only when the prices you are going on are listings of THIS item — the same product, model, or the very same piece. "similar" when they are comparable items: the same kind of thing from other makers, other models, other artists. A one-of-a-kind piece is almost always "similar", since what the search finds is other people's work. When in doubt, "similar".
-- confidence: "high" when the results give you a workable idea of the price; "low" when they were off-target, about a different item, or carried no prices at all. Calibrate this to the job: for a one-of-a-kind piece the seller wants a ballpark, so a few comparable listings with visible prices is enough and demanding a thorough survey just returns nothing. For a resale item the bar is higher, because a real going rate exists and asking prices are not it. When genuinely in doubt choose "low" — the existing estimate is kept and nothing is lost.
-- rangeUSD: NOT the raw spread of what you found. The cheapest listing is usually an outlier and so is the dearest — one is a bargain or a mistake, the other is someone hoping. Trim both ends and give the band where a piece like this would realistically change hands: above the lowest asking price, below the highest, and drawn from the bulk of what you saw in the middle. Widen it a little when the results were thin, because a thin sample deserves an honest band — but a range so wide it spans every possibility tells the seller nothing. For an original, keep the band generous — a tier spans real spread and pretending otherwise is false precision — but never so wide it spans two tiers. If confidence is "low", repeat the existing estimate unchanged.
+- evidence: how much the search gave you to price with.
+  • "none" — nothing usable: the results were off-target, about a different item, category pages with no prices showing, or carried no prices at all.
+  • "a_few" — one to a few relevant prices: real, but too thin to stand behind on their own. They can still nudge the estimate. Relevant means close to what this piece is worth: for an original, prices in or next to the tier you place it in. Prices that only show a different tier (gallery pieces when this is a decorative canvas, $5 prints when it is handmade) did not help price THIS piece, so on their own they are "none".
+  • "enough" — the results give you a workable idea of the price. Calibrate this to the job: for a one-of-a-kind piece the seller wants a ballpark, so a handful of comparable listings with visible prices is enough and demanding a thorough survey just returns nothing. For a resale item the bar is higher, because a real going rate exists and asking prices are not it.
+  Report what you actually saw. When torn between two levels, choose the lower one — the seller is told plainly either way, and overstating the evidence is the one mistake that misleads them.
+- rangeUSD: NOT the raw spread of what you found. The cheapest listing is usually an outlier and so is the dearest — one is a bargain or a mistake, the other is someone hoping. Trim both ends and give the band where a piece like this would realistically change hands: above the lowest asking price, below the highest, and drawn from the bulk of what you saw in the middle. Widen it a little when the results were thin, because a thin sample deserves an honest band — but a range so wide it spans every possibility tells the seller nothing. For an original, keep the band generous — a tier spans real spread and pretending otherwise is false precision — but never so wide it spans two tiers. If evidence is "a_few", let those prices move the existing estimate only as far as they actually point, and keep the band wide. If evidence is "none", repeat the existing estimate unchanged.
 - note: ONE short line under the price saying WHERE it came from. Under 40 characters. Do not say whether the listings were for this item or similar ones — match carries that, and the app words it. Never describe the item — the seller is looking at it, so "Based on Etsy listings for handmade stoneware mugs" wastes its second half saying what they already know. "Based on Etsy listings" is the whole note. Default to "Based on prior listings" and name a marketplace only when one clearly supplied the prices, without reaching for the same one from habit.
-  Name at most one marketplace, or none. Say "listed" for active listings and "sold" ONLY for completed sales — never call an asking price a sale.`;
+  Name at most one marketplace, or none. Say "listed" for active listings and "sold" ONLY for completed sales — never call an asking price a sale.
+- source: the ONE marketplace or site that supplied the relevant prices your range is drawn from, by its common name ("Etsy", "eBay", "Saatchi Art"), or "" when they came from several sites or none. Never name a site whose prices you set aside, such as one that only showed a different tier: the seller reads this as where the number came from. A name only, never a sentence.`;
 
 function buildSystemPrompt(basis: AnalyzeResult["valuationBasis"]): string {
   return `You are checking a price estimate against current market information. You get exactly one web search.
@@ -280,17 +285,17 @@ function interpret(
 ): VerifiedPrice | null {
   const r = (raw ?? {}) as Record<string, unknown>;
 
-  const confidence = PRICE_CONFIDENCE.includes(
-    r.confidence as (typeof PRICE_CONFIDENCE)[number],
+  const evidence = VERIFY_EVIDENCE.includes(
+    r.evidence as (typeof VERIFY_EVIDENCE)[number],
   )
-    ? (r.confidence as string)
-    : "low";
-  if (confidence !== "high") {
+    ? (r.evidence as (typeof VERIFY_EVIDENCE)[number])
+    : "none";
+  if (evidence === "none") {
     // Log what the search actually turned up. A discard is the common case and
     // the expensive one — we paid for the search and kept the estimate anyway —
     // so this line is the only way to tell an unhelpful search (nothing indexed,
     // wrong market) from an unhelpfully strict bar.
-    console.log(`[verify] low confidence: ${String(r.findings ?? "").slice(0, 600)}`);
+    console.log(`[verify] no usable prices: ${String(r.findings ?? "").slice(0, 600)}`);
     return null;
   }
 
@@ -324,6 +329,21 @@ function interpret(
   // half-sentence under the price, so anything over budget falls back to the
   // generic line instead. Nothing is lost: the overflow is always padding, and
   // the note only ever claimed to say where the number came from.
+  if (evidence === "a_few") {
+    // Worded here, not by the model: a thin result says so in the same few
+    // words every time, naming the site only when one clearly supplied them.
+    const source = cleanText(r.source);
+    return {
+      low,
+      high,
+      note:
+        source.length > 0 && source.length <= 25
+          ? `Based on a few listings from ${source}`
+          : "Based on a few listings",
+      strength: "a_few",
+    };
+  }
+
   const GENERIC = "Based on prior listings";
   const where = note.length > 0 && note.length <= 40 ? note : GENERIC;
   return {
@@ -332,6 +352,7 @@ function interpret(
     // Added here rather than asked of the model, so the 40-character budget
     // above stays about the source and the wording never drifts.
     note: exact ? where : `${where} of similar items`,
+    strength: "enough",
   };
 }
 

@@ -137,16 +137,40 @@ test("a price from listings of this exact item keeps the plain note", async () =
 test("a web search whose findings were discarded is recorded as no_listings", async () => {
   process.env.PRICE_VERIFY = "on";
   fake.visionItem = ORIGINAL_ITEM;
-  fake.verifyReply = { ...fake.verifyReply, confidence: "low" };
+  fake.verifyReply = { ...fake.verifyReply, evidence: "none" };
 
   const res = await scan();
-  // The seller sees the estimate with no note: nothing about the lookup.
-  assert.equal(res.body.priceNote, "");
+  // The model's own estimate stays, and the seller is told the search came up empty.
+  assert.equal(res.body.priceNote, "Couldn't find listings");
   assert.equal(res.body.priceBasis, "estimate");
+  assert.deepEqual(res.body.estimatedValueUSD, ORIGINAL_ITEM.estimatedValueUSD);
 
   const [e] = await readScanEvents();
   assert.equal(e!.verify, "no_listings");
   assert.equal(e!.verifiedLow, undefined);
+});
+
+test("a web search that found a few listings moves the price under a plain note", async () => {
+  process.env.PRICE_VERIFY = "on";
+  fake.visionItem = ORIGINAL_ITEM;
+  fake.verifyReply = { ...fake.verifyReply, evidence: "a_few", rangeUSD: { low: 70, high: 140 } };
+
+  const res = await scan();
+  assert.equal(res.body.priceNote, "Based on a few listings from Etsy");
+  assert.equal(res.body.priceBasis, "estimate");
+  assert.deepEqual(res.body.estimatedValueUSD, { low: 70, high: 140 });
+
+  const [e] = await readScanEvents();
+  assert.equal(e!.verify, "few_listings");
+});
+
+test("a few listings from several sites are not credited to one", async () => {
+  process.env.PRICE_VERIFY = "on";
+  fake.visionItem = ORIGINAL_ITEM;
+  fake.verifyReply = { ...fake.verifyReply, evidence: "a_few", source: "" };
+
+  const res = await scan();
+  assert.equal(res.body.priceNote, "Based on a few listings");
 });
 
 test("a web search skipped because the device's allowance is spent is recorded as no_allowance", async () => {
