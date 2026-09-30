@@ -429,18 +429,19 @@ export default function App() {
 
   // How sure the app is, in two words, or nothing at all.
   //
-  // "very certain" is reserved for a number a web search actually refined —
+  // "certain" covers two cases: a number a web search actually refined —
   // the only case where something outside the model's own memory backed the
-  // price. "certain" is the model alone, but with all three of its own
-  // checks passed — the same case that puts "Exact product match" under the
-  // price, and the badge agrees with it. "pretty certain" is left for when a
-  // lookup ran and came back empty, so the grey note replaces that tick.
+  // price — and the model alone with all three of its own checks passed, the
+  // same case that puts "Exact product match" under the price. The price
+  // note underneath is what tells them apart, so the badge needn't.
+  // "pretty certain" is left for when a lookup ran and came back empty, so
+  // the grey note replaces that tick.
   // Deliberately not worded as sold-price evidence: the search reads asking
   // prices off live listings, and sold data is exactly what is NOT on the
   // open web (see shouldVerify in lib/handler.ts).
   const certainty = result
     ? result.priceBasis === "verified"
-      ? "very certain"
+      ? "certain"
       : confidentResale
         ? result.priceNote
           ? "pretty certain"
@@ -716,8 +717,8 @@ export default function App() {
                     A verified price outranks a generic match. Originals are
                     always "generic" — a one-of-a-kind piece is never an exact
                     product — and originals are the only items that get
-                    searched, so checking specificity first meant "very
-                    certain" could never appear, and a searched price sat
+                    searched, so checking specificity first meant a searched
+                    price could never read "certain", and instead sat
                     under a "best guess" badge. */}
                 {result.priceBasis !== "verified" &&
                 result.specificity === "generic" ? (
@@ -749,7 +750,8 @@ export default function App() {
                     {price.high}
                   </Text>
                   {/* One line under the price saying how much to trust it.
-                      Green tick when something backs the number, muted grey
+                      Blue tick, matching the "certain" badge, when something
+                      backs the number, muted grey
                       when a lookup came back empty, nothing at all when the
                       model is working from a guess — silence is the honest
                       signal there, and the "generic" nudge above already says
@@ -1347,8 +1349,8 @@ const styles = StyleSheet.create({
   },
   price: { color: "#fff", fontSize: 38, fontWeight: "800" },
   priceRange: { color: "#fff", fontSize: 15 },
-  // Same green as the section headings — this line means "we checked".
-  priceNote: { color: "#4ADE80", fontSize: 13, marginTop: 8 },
+  // Same blue as the "certain" badge — this line means "we checked".
+  priceNote: { color: "#7FBEF5", fontSize: 13, marginTop: 8 },
   priceNoteMuted: { color: "#8A8A93", fontSize: 13, marginTop: 8 },
   recLead: { color: "#fff", fontSize: 17, fontWeight: "700" },
   reason: { color: "#C8C8D0", fontSize: 14, lineHeight: 20 },
