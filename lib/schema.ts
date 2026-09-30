@@ -86,6 +86,7 @@ export const PLATFORM_NAMES = [
   "Poshmark",
   "Etsy",
   "StockX",
+  "Reverb",
 ] as const;
 
 // What a scan that names no marketplaces may recommend: the list 1.0.x builds

@@ -31,13 +31,20 @@ export async function loadSettings(): Promise<Settings> {
     const marketplaces = Array.isArray(saved.marketplaces)
       ? MARKETPLACE_NAMES.filter((m) => saved.marketplaces!.includes(m))
       : DEFAULT_SETTINGS.marketplaces;
+    const otherMarketplaces =
+      typeof saved.otherMarketplaces === "boolean"
+        ? saved.otherMarketplaces
+        : DEFAULT_SETTINGS.otherMarketplaces;
     return {
-      marketplaces:
-        marketplaces.length > 0 ? marketplaces : DEFAULT_SETTINGS.marketplaces,
-      otherMarketplaces:
-        typeof saved.otherMarketplaces === "boolean"
-          ? saved.otherMarketplaces
-          : DEFAULT_SETTINGS.otherMarketplaces,
+      // "Loot Check decides" means every marketplace is on, so it also turns
+      // on any added since the settings were saved (Reverb, in 1.0.5). A
+      // seller who picked their own keeps exactly their picks.
+      marketplaces: otherMarketplaces
+        ? MARKETPLACE_NAMES
+        : marketplaces.length > 0
+          ? marketplaces
+          : DEFAULT_SETTINGS.marketplaces,
+      otherMarketplaces,
     };
   } catch {
     return DEFAULT_SETTINGS;

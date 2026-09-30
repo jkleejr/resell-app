@@ -51,16 +51,16 @@ test("names are matched regardless of case", async () => {
 });
 
 test("with other marketplaces on, an unlisted site is kept", async () => {
-  const body = await scanPicking("Reverb", {
+  const body = await scanPicking("Grailed", {
     marketplaces: ["eBay"],
     otherMarketplaces: true,
   });
-  assert.equal(body.recommendedPlatform, "Reverb");
+  assert.equal(body.recommendedPlatform, "Grailed");
   assert.equal(body.recommendationReason, RESALE_ITEM.recommendationReason);
 });
 
 test("with other marketplaces off, an unlisted site is replaced", async () => {
-  const body = await scanPicking("Reverb", {
+  const body = await scanPicking("Grailed", {
     marketplaces: ["eBay"],
     otherMarketplaces: false,
   });
@@ -69,11 +69,18 @@ test("with other marketplaces off, an unlisted site is replaced", async () => {
 
 test("an app that sends no settings only ever gets the original seven", async () => {
   // Installed 1.0.x builds have no row for these, so they must never see them.
-  for (const pick of ["Etsy", "StockX", "Reverb"]) {
+  for (const pick of ["Etsy", "StockX", "Reverb", "Grailed"]) {
     const body = await scanPicking(pick);
     assert.equal(body.recommendedPlatform, "Facebook Marketplace");
   }
   assert.equal((await scanPicking("Mercari")).recommendedPlatform, "Mercari");
+});
+
+test("Reverb is a listed marketplace: kept when the seller uses it, spelled the app's way", async () => {
+  const kept = await scanPicking("reverb", { marketplaces: ["eBay", "Reverb"] });
+  assert.equal(kept.recommendedPlatform, "Reverb");
+  const off = await scanPicking("Reverb", { marketplaces: ["eBay"] });
+  assert.equal(off.recommendedPlatform, "eBay");
 });
 
 test("unknown names in the seller's list are ignored", async () => {
@@ -115,15 +122,15 @@ test("the recommended marketplace always leads the list", async () => {
 
 test("other sites are listed only when the seller allows them", async () => {
   const settings = { marketplaces: ["eBay"] };
-  assert.deepEqual(await relevantFor("eBay", ["eBay", "Reverb"], settings), ["eBay"]);
+  assert.deepEqual(await relevantFor("eBay", ["eBay", "Grailed"], settings), ["eBay"]);
   assert.deepEqual(
-    await relevantFor("eBay", ["eBay", "Reverb"], { ...settings, otherMarketplaces: true }),
-    ["eBay", "Reverb"],
+    await relevantFor("eBay", ["eBay", "Grailed"], { ...settings, otherMarketplaces: true }),
+    ["eBay", "Grailed"],
   );
 });
 
 test("the list holds at most seven marketplaces, each once", async () => {
-  const all = ["Facebook Marketplace", "OfferUp", "Vinted", "Depop", "Mercari", "eBay", "Poshmark", "Etsy", "StockX"];
+  const all = ["Facebook Marketplace", "OfferUp", "Vinted", "Depop", "Mercari", "eBay", "Poshmark", "Etsy", "StockX", "Reverb"];
   const list = await relevantFor("eBay", ["eBay", "eBay", ...all], { marketplaces: all });
   assert.equal(list.length, 7);
   assert.equal(new Set(list).size, 7);

@@ -153,6 +153,7 @@ Rules:
   • Mercari — general shippable goods at mid value.
   • Etsy — handmade, vintage (20+ years old), art, and craft supplies. The natural home for original and handmade pieces. Without it, usually Depop for small decorative or wearable work, eBay for anything a buyer would search for by subject or style.
   • StockX — new or deadstock sneakers, streetwear, trading cards and collectibles, and some current electronics. Not for used everyday goods.
+  • Reverb — musical instruments, amps, pedals, DJ, studio, and pro audio gear. Musicians shop here first; not for anything else.
   When the best home for this item isn't among the seller's marketplaces, pick the closest fit from theirs and say so plainly in recommendationReason.
 - recommendationReason: ONE short sentence, specific to this item, on why that platform is the best place to sell it.
 - relevantPlatforms: the marketplaces where THIS item would realistically sell, best first, starting with recommendedPlatform. At most 7, from the same choices as recommendedPlatform. Leave out any whose buyers don't want this kind of item — StockX for a used lamp, Poshmark for a power drill, local-only sites for something small and valuable that ships well. A short list is fine; a padded one sends the seller somewhere it won't sell.

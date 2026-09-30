@@ -47,6 +47,7 @@ function rateAt(p: Platform, price: number): Platform {
 //
 // Etsy (US): $0.20 listing + 6.5% transaction + 3% + $0.25 payment processing.
 // StockX: 9% transaction at seller level 1 + 3% processing, $5 minimum.
+// Reverb (US): 5% selling fee + 3.19% + $0.49 payment processing.
 const PLATFORMS: Platform[] = [
   { name: "Facebook Marketplace", feePct: 0.0, flatFee: 0, shipping: "local" },
   { name: "OfferUp", feePct: 0.0, flatFee: 0, shipping: "local" },
@@ -57,6 +58,7 @@ const PLATFORMS: Platform[] = [
   { name: "Poshmark", feePct: 0.2, flatFee: 0, shipping: "prepaid" },
   { name: "Etsy", feePct: 0.095, flatFee: 0.45, shipping: "prepaid" },
   { name: "StockX", feePct: 0.12, flatFee: 0, minFee: 5, shipping: "prepaid" },
+  { name: "Reverb", feePct: 0.0819, flatFee: 0.49, shipping: "prepaid" },
 ];
 
 /** Every marketplace the app knows the fees of, in display order. */
@@ -66,11 +68,9 @@ export const MARKETPLACE_NAMES: string[] = PLATFORMS.map((p) => p.name);
 // is allowed to choose, and whose fees are known. Their rows show a real
 // payout instead of "Fees vary". Matched by name, ignoring case.
 //
-// Reverb (US): 5% selling fee + 3.19% + $0.49 payment processing.
 // Grailed: 9% commission at $120 and up; 6% (min $1.99) under $120. Commission
 // only: Grailed's separate payment processing fee is not included.
 const KNOWN_OTHER_SITES: Platform[] = [
-  { name: "Reverb", feePct: 0.0819, flatFee: 0.49, shipping: "prepaid" },
   {
     name: "Grailed",
     feePct: 0.09,
@@ -249,6 +249,7 @@ const MARKETPLACE_URLS: Record<string, string> = {
   Poshmark: "https://poshmark.com/create-listing",
   Etsy: "https://www.etsy.com/your/shops/me/listing-editor/create",
   StockX: "https://stockx.com/sell",
+  Reverb: "https://reverb.com/sell",
 };
 
 export function marketplaceUrl(name: string): string {
