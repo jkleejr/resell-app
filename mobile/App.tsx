@@ -554,20 +554,23 @@ export default function App() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
-        <View style={styles.headerRow}>
-          <Text style={styles.brand}>Loot Check</Text>
-          {/* Settings from the home screen only, never mid-scan. */}
-          {status === "idle" && images.length === 0 && (
-            <Pressable
-              onPress={() => setScreen("settings")}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Settings"
-            >
-              <Ionicons name="settings-outline" size={26} color="#A8A8B0" />
-            </Pressable>
-          )}
-        </View>
+        {/* The result page opens straight on the photo, with no name above. */}
+        {status !== "done" && (
+          <View style={styles.headerRow}>
+            <Text style={styles.brand}>Loot Check</Text>
+            {/* Settings from the home screen only, never mid-scan. */}
+            {status === "idle" && images.length === 0 && (
+              <Pressable
+                onPress={() => setScreen("settings")}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Settings"
+              >
+                <Ionicons name="settings-outline" size={26} color="#A8A8B0" />
+              </Pressable>
+            )}
+          </View>
+        )}
         {/* The pitch is for the start screens only. Once a scan is under way
             or showing, the photo and result should sit right under the name. */}
         {status !== "working" && status !== "done" && (
@@ -577,7 +580,7 @@ export default function App() {
           </Text>
         )}
 
-        {(totalScans !== null || status === "working") && (
+        {status !== "done" && (totalScans !== null || status === "working") && (
           <View style={styles.counterRow}>
             {totalScans !== null ? (
               <Text style={styles.counter}>
