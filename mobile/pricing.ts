@@ -54,13 +54,35 @@ const SHIPPING_LABEL: Record<Shipping, string> = {
   prepaid: "Ship",
 };
 
+// Marketplaces the app has no fee table for ("other" sites the AI suggests
+// when the seller lets it choose) still say how the sale happens. Nearly all
+// of them ship (Reverb, Grailed, Discogs, Swappa, Chrono24, ...); the
+// local-pickup ones are few and well known, so those are listed and anything
+// else is Ship.
+const LOCAL_ONLY_SITES = [
+  "craigslist",
+  "nextdoor",
+  "kijiji",
+  "gumtree",
+  "letgo",
+  "5miles",
+  "varagesale",
+];
+
+function otherShipping(name: string): string {
+  const n = name.toLowerCase().replace(/\s+/g, "");
+  return LOCAL_ONLY_SITES.some((site) => n.includes(site))
+    ? SHIPPING_LABEL.local
+    : SHIPPING_LABEL.prepaid;
+}
+
 export type ComparisonRow = {
   name: string;
   net: number;
   feeNote: string;
   /** No known fee to take off: nothing is shown in red. */
   feeFree: boolean;
-  /** Empty for a marketplace the app has no details for. */
+  /** "Local" or "Ship", for every row. */
   shipping: string;
   recommended: boolean;
 };
@@ -140,7 +162,7 @@ export function buildComparison(
           net: Math.max(0, Math.round(anchor)),
           feeNote: "Fees vary",
           feeFree: true,
-          shipping: "",
+          shipping: otherShipping(name),
           recommended: name === recommendedName,
         };
   };

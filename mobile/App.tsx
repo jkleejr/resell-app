@@ -837,7 +837,7 @@ export default function App() {
                         <Text style={row.feeFree ? null : styles.rowFee}>
                           {row.feeNote}
                         </Text>
-                        {/* An "other" marketplace has no shipping detail. */}
+                        {/* Every row has one now; kept for scans saved by older builds. */}
                         {row.shipping ? `, ${row.shipping}` : ""}
                       </Text>
                     </View>
