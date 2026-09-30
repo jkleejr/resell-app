@@ -431,15 +431,20 @@ export default function App() {
   //
   // "very certain" is reserved for a number a web search actually refined —
   // the only case where something outside the model's own memory backed the
-  // price. "pretty certain" is the model alone, but with all three of its
-  // own checks passed. Deliberately not worded as sold-price evidence: the
-  // search reads asking prices off live listings, and sold data is exactly
-  // what is NOT on the open web (see shouldVerify in lib/handler.ts).
+  // price. "certain" is the model alone, but with all three of its own
+  // checks passed — the same case that puts "Exact product match" under the
+  // price, and the badge agrees with it. "pretty certain" is left for when a
+  // lookup ran and came back empty, so the grey note replaces that tick.
+  // Deliberately not worded as sold-price evidence: the search reads asking
+  // prices off live listings, and sold data is exactly what is NOT on the
+  // open web (see shouldVerify in lib/handler.ts).
   const certainty = result
     ? result.priceBasis === "verified"
       ? "very certain"
       : confidentResale
-        ? "pretty certain"
+        ? result.priceNote
+          ? "pretty certain"
+          : "certain"
         : null
     : null;
 
