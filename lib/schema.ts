@@ -78,13 +78,13 @@ export const CRAFT_LEVEL = [
 // from those, or — when the seller allows it — any other marketplace.
 export const PLATFORM_NAMES = [
   "Facebook Marketplace",
-  "OfferUp",
-  "Vinted",
-  "Depop",
-  "Mercari",
   "eBay",
-  "Poshmark",
   "Etsy",
+  "Poshmark",
+  "Mercari",
+  "OfferUp",
+  "Depop",
+  "Vinted",
   "StockX",
   "Reverb",
 ] as const;

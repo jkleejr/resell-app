@@ -42,21 +42,23 @@ function rateAt(p: Platform, price: number): Platform {
 }
 
 // Hard-coded public fee structures (2026). Revisit occasionally. The order is
-// the order Settings lists them in. Names MUST match PLATFORM_NAMES in
-// lib/schema.ts — the backend holds the model's pick to these spellings.
+// the order Settings lists them in, below "Loot Check decides": roughly by how
+// many US buyers and listings each has, biggest first. Names and order MUST
+// match PLATFORM_NAMES in lib/schema.ts — the backend holds the model's pick
+// to these spellings.
 //
 // Etsy (US): $0.20 listing + 6.5% transaction + 3% + $0.25 payment processing.
 // StockX: 9% transaction at seller level 1 + 3% processing, $5 minimum.
 // Reverb (US): 5% selling fee + 3.19% + $0.49 payment processing.
 const PLATFORMS: Platform[] = [
   { name: "Facebook Marketplace", feePct: 0.0, flatFee: 0, shipping: "local" },
-  { name: "OfferUp", feePct: 0.0, flatFee: 0, shipping: "local" },
-  { name: "Vinted", feePct: 0.0, flatFee: 0, shipping: "prepaid" },
-  { name: "Depop", feePct: 0.0, flatFee: 0, shipping: "prepaid" },
-  { name: "Mercari", feePct: 0.1, flatFee: 0, shipping: "prepaid" },
   { name: "eBay", feePct: 0.13, flatFee: 0.35, shipping: "prepaid" },
-  { name: "Poshmark", feePct: 0.2, flatFee: 0, shipping: "prepaid" },
   { name: "Etsy", feePct: 0.095, flatFee: 0.45, shipping: "prepaid" },
+  { name: "Poshmark", feePct: 0.2, flatFee: 0, shipping: "prepaid" },
+  { name: "Mercari", feePct: 0.1, flatFee: 0, shipping: "prepaid" },
+  { name: "OfferUp", feePct: 0.0, flatFee: 0, shipping: "local" },
+  { name: "Depop", feePct: 0.0, flatFee: 0, shipping: "prepaid" },
+  { name: "Vinted", feePct: 0.0, flatFee: 0, shipping: "prepaid" },
   { name: "StockX", feePct: 0.12, flatFee: 0, minFee: 5, shipping: "prepaid" },
   { name: "Reverb", feePct: 0.0819, flatFee: 0.49, shipping: "prepaid" },
 ];
