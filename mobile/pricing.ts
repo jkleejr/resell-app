@@ -98,7 +98,7 @@ export function marketplaceDetails(
 export function speedLabel(speed: "fast" | "moderate" | "slow"): string {
   switch (speed) {
     case "fast":
-      return "Likely to sell fast — often within days.";
+      return "Likely to sell fast.";
     case "moderate":
       return "Usually sells within a couple of weeks.";
     case "slow":
