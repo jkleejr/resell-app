@@ -50,6 +50,7 @@ function rateAt(p: Platform, price: number): Platform {
 // Etsy (US): $0.20 listing + 6.5% transaction + 3% + $0.25 payment processing.
 // StockX: 9% transaction at seller level 1 + 3% processing, $5 minimum.
 // Reverb (US): 5% selling fee + 3.19% + $0.49 payment processing.
+// Depop (US): no selling fee; 3.3% + $0.45 payment processing.
 const PLATFORMS: Platform[] = [
   { name: "Facebook Marketplace", feePct: 0.0, flatFee: 0, shipping: "local" },
   { name: "eBay", feePct: 0.13, flatFee: 0.35, shipping: "prepaid" },
@@ -57,7 +58,7 @@ const PLATFORMS: Platform[] = [
   { name: "Poshmark", feePct: 0.2, flatFee: 0, shipping: "prepaid" },
   { name: "Mercari", feePct: 0.1, flatFee: 0, shipping: "prepaid" },
   { name: "OfferUp", feePct: 0.0, flatFee: 0, shipping: "local" },
-  { name: "Depop", feePct: 0.0, flatFee: 0, shipping: "prepaid" },
+  { name: "Depop", feePct: 0.033, flatFee: 0.45, shipping: "prepaid" },
   { name: "Vinted", feePct: 0.0, flatFee: 0, shipping: "prepaid" },
   { name: "StockX", feePct: 0.12, flatFee: 0, minFee: 5, shipping: "prepaid" },
   { name: "Reverb", feePct: 0.0819, flatFee: 0.49, shipping: "prepaid" },
