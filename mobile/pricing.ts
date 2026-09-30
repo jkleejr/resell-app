@@ -80,7 +80,7 @@ export type ComparisonRow = {
   name: string;
   net: number;
   feeNote: string;
-  /** No known fee to take off: nothing is shown in red. */
+  /** No seller fee: shown in grey. Any fee, known or not, is shown in red. */
   feeFree: boolean;
   /** "Local" or "Ship", for every row. */
   shipping: string;
@@ -161,7 +161,9 @@ export function buildComparison(
           name,
           net: Math.max(0, Math.round(anchor)),
           feeNote: "Fees vary",
-          feeFree: true,
+          // A fee this site charges but the app can't price: still a fee, so
+          // it is red like the others.
+          feeFree: false,
           shipping: otherShipping(name),
           recommended: name === recommendedName,
         };
