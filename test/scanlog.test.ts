@@ -139,7 +139,10 @@ test("a web search whose findings were discarded is recorded as no_listings", as
   fake.visionItem = ORIGINAL_ITEM;
   fake.verifyReply = { ...fake.verifyReply, confidence: "low" };
 
-  await scan();
+  const res = await scan();
+  // The seller sees the estimate with no note: nothing about the lookup.
+  assert.equal(res.body.priceNote, "");
+  assert.equal(res.body.priceBasis, "estimate");
 
   const [e] = await readScanEvents();
   assert.equal(e!.verify, "no_listings");

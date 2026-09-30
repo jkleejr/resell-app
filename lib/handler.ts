@@ -318,26 +318,17 @@ async function maybeVerifyPrice(
   const outcome = await verifyPrice(result, remainingMs);
   const spent = { ms: Date.now() - verifyStartedAt, costUSD: outcome.costUSD };
   if (!outcome.price) {
-    // Two different situations, and only one of them is ours to explain.
-    //
-    // A search that ran and came back empty earns a line: the scan just took
-    // ten seconds longer than usual and the seller deserves to know why,
-    // without a tour of which marketplaces were tried. WHICH site failed is our
-    // problem, not theirs — "no eBay results" invites them to wonder whether
-    // eBay is broken. priceBasis stays "estimate" because the number is still
-    // the model's own.
-    //
-    // A search that never ran — it timed out, threw, or was never issued —
-    // earns silence. "Couldn't find listings" would be the app describing an
-    // outcome it never reached, and the seller has no use for a report on a
-    // lookup that did not happen.
-    return outcome.searched
-      ? {
-          result: { ...result, priceNote: "Couldn't find listings" },
-          status: "no_listings",
-          ...spent,
-        }
-      : { result, status: "not_searched", ...spent };
+    // Nothing usable came back, so the seller sees the model's own estimate
+    // with no note under it. A search that ran and found nothing used to say
+    // "Couldn't find listings"; it no longer does, because it told the seller
+    // about our lookup rather than their item, and Sonnet 5.5 comes back empty
+    // more often than 4.6 did (it won't call a thin search a match). The log
+    // still tells the two apart. priceBasis stays "estimate" either way.
+    return {
+      result,
+      status: outcome.searched ? "no_listings" : "not_searched",
+      ...spent,
+    };
   }
 
   return {
