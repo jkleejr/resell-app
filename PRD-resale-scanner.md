@@ -148,7 +148,7 @@ Routing + comparison table + provenance labeling run **client-side** — pure lo
 
 - **Client:** Expo (React Native), TypeScript. `expo-camera` / `expo-image-picker` capture, `expo-image-manipulator` downscaling.
 - **Backend:** Vercel serverless functions, TypeScript.
-- **Vision:** Anthropic API (`claude-sonnet-4-6`), image + structured-JSON prompt.
+- **Vision:** Anthropic API (`claude-sonnet-5-5`), image + structured-JSON prompt.
 - **Pricing:** third-party sold-comps API (pick provider at M3).
 - **Image search (M5):** SerpAPI Google Lens (preferred — does ID + cross-platform pricing in one call) or eBay Browse Search-by-Image.
 - **Env:** secrets in Vercel env vars only. Never in the app.

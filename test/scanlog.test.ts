@@ -67,11 +67,11 @@ test("a successful scan is remembered as one anonymous record of what happened",
   assert.equal(e.high, 40);
   assert.equal(e.verify, "not_eligible");
   assert.equal(e.retried, false);
-  assert.equal(e.model, "claude-sonnet-4-6");
+  assert.equal(e.model, "claude-sonnet-5-5");
   assert.equal(e.inputTokens, 1200);
   assert.equal(e.outputTokens, 200);
-  // 1200 in × $3/M + 200 out × $15/M
-  assert.equal(e.costUSD, 0.0066);
+  // 1200 in × $2/M + 200 out × $10/M
+  assert.equal(e.costUSD, 0.0044);
   assert.ok(typeof e.totalMs === "number" && e.totalMs >= 0);
   assert.ok(typeof e.visionMs === "number" && e.visionMs <= e.totalMs);
 });
@@ -113,8 +113,8 @@ test("an original that a web search repriced keeps both the estimate and the ver
   assert.deepEqual([e!.low, e!.high], [60, 120]);
   assert.deepEqual([e!.verifiedLow, e!.verifiedHigh], [90, 150]);
   assert.ok(typeof e!.verifyMs === "number");
-  // vision $0.0066 + verify (9000 in × $3/M + 200 out × $15/M + one $0.01 search)
-  assert.equal(e!.costUSD, 0.0466);
+  // vision $0.0044 + verify (9000 in × $2/M + 200 out × $10/M + one $0.01 search)
+  assert.equal(e!.costUSD, 0.0344);
 });
 
 test("a price from listings of comparable pieces says so in the note", async () => {

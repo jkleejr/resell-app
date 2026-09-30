@@ -66,7 +66,7 @@ function message(text: string, usage: Record<string, unknown>) {
     id: "msg_fake",
     type: "message",
     role: "assistant",
-    model: "claude-sonnet-4-6",
+    model: "claude-sonnet-5-5",
     content: [{ type: "text", text }],
     stop_reason: "end_turn",
     stop_sequence: null,

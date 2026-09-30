@@ -15,11 +15,23 @@ import {
 } from "./schema.js";
 import { cleanText, completeSentences, dropHedges, dropTitleHedges } from "./text.js";
 
-// Sonnet 4.6 is the default: vision-capable, supports structured outputs, and
-// cheap enough to run per-scan. Override with the MODEL env var to A/B test a
-// cheaper model (e.g. MODEL=claude-haiku-4-5, ~3x cheaper) against it on real
-// photos — both support vision + structured outputs, so no other code changes.
-const MODEL = process.env.MODEL ?? "claude-sonnet-4-6";
+// Sonnet 5.5 is the default: vision-capable, supports structured outputs, and
+// cheap enough to run per-scan. Override with the MODEL env var to A/B test
+// another model on real photos. Note that THINKING_OFF below is Sonnet 5.5's
+// own setting: any other model rejects it, so a different MODEL needs that
+// line changed too.
+const MODEL = process.env.MODEL ?? "claude-sonnet-5-5";
+
+// Thinking off, the way Sonnet 5.5 spells it. {type: "disabled"} is a 400 on
+// this model; "between_tools" is its lowest setting, and with no tools in the
+// call it means no extended thinking at all — the same fast, single-pass call
+// the scan has always been. It is only accepted at effort "high" or below, so
+// the effort is set explicitly next to it. The SDK's types predate the value,
+// hence the cast. Shared with verify.ts.
+export const THINKING_OFF = {
+  type: "between_tools",
+} as unknown as Anthropic.Messages.ThinkingConfigParam;
+export const EFFORT = "high" as const;
 
 // Wall-clock ceiling on the FIRST vision attempt.
 //
@@ -53,7 +65,7 @@ const MAX_OUTPUT_TOKENS = 4096;
 // Per-1M-token prices (USD) for the cost log below. Keep in sync with the
 // models we actually switch between; unknown models just skip the cost line.
 const PRICING: Record<string, { input: number; output: number }> = {
-  "claude-sonnet-4-6": { input: 3, output: 15 },
+  "claude-sonnet-5-5": { input: 2, output: 10 },
   "claude-haiku-4-5": { input: 1, output: 5 },
 };
 
@@ -164,6 +176,14 @@ export function isTimeout(err: unknown): boolean {
   );
 }
 
+/** The model declined to analyze the photos. See the stop_reason check below. */
+export class RefusalError extends Error {
+  constructor(readonly category: string | null) {
+    super(`Model declined the request (category: ${category ?? "none"})`);
+    this.name = "RefusalError";
+  }
+}
+
 export interface ImageInput {
   /** base64-encoded image data, no `data:` prefix. */
   data: string;
@@ -243,7 +263,7 @@ export async function analyzeImage(
     new Anthropic({ timeout, maxRetries: MAX_RETRIES }).messages.create({
       model: MODEL,
       max_tokens: MAX_OUTPUT_TOKENS,
-      thinking: { type: "disabled" },
+      thinking: THINKING_OFF,
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -252,6 +272,7 @@ export async function analyzeImage(
         },
       ],
       output_config: {
+        effort: EFFORT,
         format: {
           type: "json_schema",
           schema: ANALYZE_SCHEMA as unknown as Record<string, unknown>,
@@ -297,6 +318,14 @@ export async function analyzeImage(
   // listing text most of all, since it is the longest field — and the result
   // still parses, so nothing downstream would notice. Fail instead: a scan the
   // seller retries beats a listing that ends on "and".
+  // Sonnet 5.5 can decline a request outright: an HTTP 200 with
+  // stop_reason "refusal" and no usable text. It is rare for a photo of
+  // something to sell, and retrying the same photo gets the same answer, so it
+  // goes up as its own error and the handler tells the seller in plain words.
+  if (response.stop_reason === "refusal") {
+    throw new RefusalError(response.stop_details?.category ?? null);
+  }
+
   if (response.stop_reason === "max_tokens") {
     throw new Error(
       `Response hit the ${MAX_OUTPUT_TOKENS}-token cap and was truncated` +

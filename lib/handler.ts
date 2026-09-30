@@ -2,6 +2,7 @@ import {
   analyzeImage,
   isTimeout,
   LEGACY_MARKETPLACES,
+  RefusalError,
   type AnalyzeTrace,
   type ImageInput,
   type Marketplaces,
@@ -175,6 +176,16 @@ export async function handleAnalyzeRequest(
       return {
         status: 504,
         body: { error: "That took longer than expected. Please try again." },
+      };
+    }
+    // The model declined to look at these photos. Saying so beats "Analysis
+    // failed", which invites the same photo again for the same answer.
+    if (err instanceof RefusalError) {
+      return {
+        status: 422,
+        body: {
+          error: "Loot Check can't price this item. Try a photo of something else.",
+        },
       };
     }
     return { status: 502, body: { error: "Analysis failed" } };

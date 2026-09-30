@@ -6,7 +6,7 @@ import {
   type VerifiedPrice,
   type VerifyOutcome,
 } from "./schema.js";
-import { tokenCostUSD } from "./analyze.js";
+import { EFFORT, THINKING_OFF, tokenCostUSD } from "./analyze.js";
 import { cleanText } from "./text.js";
 
 // The optional second pass: one web search to sanity-check the model's own
@@ -23,7 +23,7 @@ import { cleanText } from "./text.js";
 // comp is worse for the seller than an honest guess, so the bar to overwrite
 // the estimate is deliberately high.
 
-const MODEL = process.env.VERIFY_MODEL ?? "claude-sonnet-4-6";
+const MODEL = process.env.VERIFY_MODEL ?? "claude-sonnet-5-5";
 
 // Ceiling on the whole verification, including the search. Past this we
 // abandon it and serve the estimate — a slow scan is a worse product than an
@@ -178,7 +178,7 @@ export async function verifyPrice(
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 700,
-      thinking: { type: "disabled" },
+      thinking: THINKING_OFF,
       system: buildSystemPrompt(result.valuationBasis),
       messages: [{ role: "user", content: describeItem(result) }],
       tools: [
@@ -198,6 +198,7 @@ export async function verifyPrice(
         } satisfies Anthropic.Messages.WebSearchTool20250305,
       ],
       output_config: {
+        effort: EFFORT,
         format: {
           type: "json_schema",
           schema: VERIFY_SCHEMA as unknown as Record<string, unknown>,

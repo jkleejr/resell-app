@@ -17,7 +17,7 @@ function ok(over: Partial<ScanEvent> = {}): ScanEvent {
     scanOfDay: 1,
     visionMs: 5800,
     retried: false,
-    model: "claude-sonnet-4-6",
+    model: "claude-sonnet-5-5",
     costUSD: 0.01,
     category: "clothing",
     condition: "good",
