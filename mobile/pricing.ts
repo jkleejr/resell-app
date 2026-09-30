@@ -26,7 +26,20 @@ type Platform = {
   /** The least the marketplace takes on a sale, if it has a floor. */
   minFee?: number;
   shipping: Shipping;
+  /**
+   * A different rate for items priced under `price` (the fields above are
+   * the rate at `price` and up). Picked by the item's estimated value.
+   */
+  below?: { price: number; feePct: number; flatFee: number; minFee?: number };
 };
+
+// The rate that applies at this price: the lower tier when the item is priced
+// under it, otherwise the marketplace's standard rate.
+function rateAt(p: Platform, price: number): Platform {
+  return p.below && price < p.below.price
+    ? { ...p, ...p.below, below: undefined }
+    : p;
+}
 
 // Hard-coded public fee structures (2026). Revisit occasionally. The order is
 // the order Settings lists them in. Names MUST match PLATFORM_NAMES in
@@ -54,8 +67,20 @@ export const MARKETPLACE_NAMES: string[] = PLATFORMS.map((p) => p.name);
 // payout instead of "Fees vary". Matched by name, ignoring case.
 //
 // Reverb (US): 5% selling fee + 3.19% + $0.49 payment processing.
+// Grailed: 9% commission at $120 and up; 6% (min $1.99) under $120. Commission
+// only: Grailed's separate payment processing fee is not included.
 const KNOWN_OTHER_SITES: Platform[] = [
   { name: "Reverb", feePct: 0.0819, flatFee: 0.49, shipping: "prepaid" },
+  {
+    name: "Grailed",
+    feePct: 0.09,
+    flatFee: 0,
+    shipping: "prepaid",
+    below: { price: 120, feePct: 0.06, flatFee: 0, minFee: 1.99 },
+  },
+  // Swappa: 3% of the price from the seller (the buyer pays their own 3%,
+  // which doesn't change the seller's payout).
+  { name: "Swappa", feePct: 0.03, flatFee: 0, shipping: "prepaid" },
 ];
 
 function knownOtherSite(name: string): Platform | undefined {
@@ -162,7 +187,9 @@ export function buildComparison(
   relevant?: readonly string[],
 ): ComparisonRow[] {
   const row = (name: string): ComparisonRow => {
-    const p = PLATFORMS.find((x) => x.name === name) ?? knownOtherSite(name);
+    const known = PLATFORMS.find((x) => x.name === name) ?? knownOtherSite(name);
+    // Tiered marketplaces (Grailed) charge by the item's price.
+    const p = known ? rateAt(known, anchor) : undefined;
     return p
       ? {
           name,
