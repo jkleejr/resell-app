@@ -71,8 +71,13 @@ export const SCAN_ATTEMPTS: readonly ScanAttempt[] = ["new", "retry", "add_photo
 export interface ScanEvent {
   /** When the record was written (epoch ms). */
   ts: number;
-  /** "capped" = blocked by a daily limit before any model call. */
-  outcome: "ok" | "timeout" | "error" | "capped";
+  /**
+   * "capped" = blocked by a daily limit before any model call.
+   * "refused" = the model declined to analyze the photos (stop_reason
+   * "refusal"), told apart from "error" so the report can say how often it
+   * happens.
+   */
+  outcome: "ok" | "timeout" | "error" | "capped" | "refused";
   /** Whole request, as the user waited for it. */
   totalMs: number;
   photos: number;
@@ -92,6 +97,12 @@ export interface ScanEvent {
   outputTokens?: number;
   /** Everything this scan cost us: vision, plus the price check if it ran. */
   costUSD?: number;
+  /**
+   * Only on outcome "refused": the safety category the API gave ("cyber",
+   * "bio", "frontier_llm", "reasoning_extraction", "general_harms"), or "none"
+   * when it gave none. A category, never anything about the photo.
+   */
+  refusalCategory?: string;
 
   // --- What the scan concluded. Only on outcome "ok".
   category?: Category;

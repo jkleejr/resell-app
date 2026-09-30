@@ -171,6 +171,22 @@ test("a scan that fails is recorded as an error with no item details", async () 
   assert.equal(e!.low, undefined);
 });
 
+test("a scan the model refused is recorded as refused, with its category", async () => {
+  fake.visionRefusal = "general_harms";
+
+  const res = await scan();
+  assert.equal(res.status, 422);
+  assert.match(String(res.body.error), /can't price this item/);
+
+  const [e] = await readScanEvents();
+  assert.equal(e!.outcome, "refused");
+  assert.equal(e!.refusalCategory, "general_harms");
+  assert.equal(e!.retried, false);
+  assert.ok(typeof e!.costUSD === "number" && e!.costUSD > 0);
+  assert.equal(e!.category, undefined);
+  assert.equal(e!.low, undefined);
+});
+
 test("a scan the server had to retry says so", async () => {
   fake.visionStallFirstMs = 900; // past ANALYZE_TIMEOUT_MS=400, so attempt one times out
 

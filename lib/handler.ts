@@ -164,7 +164,13 @@ export async function handleAnalyzeRequest(
   } catch (err) {
     console.error("[analyze] failed:", err);
     await logScan({
-      outcome: isTimeout(err) ? "timeout" : "error",
+      outcome: isTimeout(err)
+        ? "timeout"
+        : err instanceof RefusalError
+          ? "refused"
+          : "error",
+      refusalCategory:
+        err instanceof RefusalError ? (err.category ?? "none") : undefined,
       visionMs: Date.now() - visionStartedAt,
       ...trace,
     });

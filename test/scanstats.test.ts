@@ -48,10 +48,12 @@ test("counts outcomes, and the failure rate ignores scans blocked by the cap", (
     { ts: DAY1, outcome: "error", totalMs: 900, photos: 1, hint: false },
     { ts: DAY1, outcome: "timeout", totalMs: 42000, photos: 1, hint: false },
     { ts: DAY1, outcome: "capped", totalMs: 40, photos: 1, hint: false, scanOfDay: 101 },
+    { ts: DAY1, outcome: "refused", totalMs: 3000, photos: 1, hint: false, refusalCategory: "general_harms" },
   ]);
-  assert.equal(s.total, 6);
-  assert.deepEqual(s.outcomes, { ok: 3, timeout: 1, error: 1, capped: 1 });
-  assert.equal(s.failureRate, 2 / 5);
+  assert.equal(s.total, 7);
+  assert.deepEqual(s.outcomes, { ok: 3, timeout: 1, error: 1, capped: 1, refused: 1 });
+  assert.equal(s.failureRate, 3 / 6);
+  assert.deepEqual(s.refusals, { general_harms: 1 });
 });
 
 test("splits scan time into regular scans and scans that ran a web search", () => {

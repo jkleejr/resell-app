@@ -14,8 +14,10 @@ export interface ScanSummary {
   from: number | null;
   to: number | null;
   outcomes: Record<string, number>;
-  /** Timeouts + errors, over scans that actually ran (capped ones never did). */
+  /** Timeouts, errors, and refusals, over scans that actually ran (capped ones never did). */
   failureRate: number;
+  /** Refused scans by the category the API gave. */
+  refusals: Record<string, number>;
   /** Successful scans only, as the user waited for them (ms). */
   duration: { all: Spread; regular: Spread; withSearch: Spread };
   verify: Record<string, number>;
@@ -114,7 +116,8 @@ function depth(events: ScanEvent[]): ScanSummary["depth"] {
 export function summarize(events: ScanEvent[]): ScanSummary {
   const oks = events.filter((e) => e.outcome === "ok");
   const outcomes = tally(events, (e) => e.outcome);
-  const failed = (outcomes.timeout ?? 0) + (outcomes.error ?? 0);
+  const failed =
+    (outcomes.timeout ?? 0) + (outcomes.error ?? 0) + (outcomes.refused ?? 0);
 
   const searched = (e: ScanEvent) => e.verifyMs !== undefined;
   const shifts = oks
@@ -136,6 +139,10 @@ export function summarize(events: ScanEvent[]): ScanSummary {
     to: events.length ? Math.max(...events.map((e) => e.ts)) : null,
     outcomes,
     failureRate: share(failed, oks.length + failed),
+    refusals: tally(
+      events.filter((e) => e.outcome === "refused"),
+      (e) => e.refusalCategory ?? "none",
+    ),
     duration: {
       all: spread(oks.map((e) => e.totalMs)),
       regular: spread(oks.filter((e) => !searched(e)).map((e) => e.totalMs)),

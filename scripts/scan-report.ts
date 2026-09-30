@@ -80,6 +80,10 @@ async function main(): Promise<void> {
   heading("Did scans work?");
   breakdown(s.outcomes);
   row("Failure rate (of scans that ran)", pct(s.failureRate));
+  if (Object.keys(s.refusals).length) {
+    console.log("  Refused by the AI, by safety category:");
+    breakdown(s.refusals);
+  }
   row("Server had to retry the AI call", s.serverRetries);
 
   heading("How long did people wait? (successful scans)");

@@ -15,6 +15,8 @@ export interface FakeServices {
   visionItem: Record<string, unknown>;
   /** Make every vision call fail with this HTTP status. */
   visionFailStatus: number | null;
+  /** Make every vision call a refusal in this category (HTTP 200, stop_reason "refusal"). */
+  visionRefusal: string | null;
   /** Stall only the FIRST vision call this long (to trip the server's retry). */
   visionStallFirstMs: number;
   /** The verify (web search) pass's JSON verdict. */
@@ -82,6 +84,7 @@ export async function startFakeServices(): Promise<FakeServices> {
     store: new Map(),
     visionItem: RESALE_ITEM,
     visionFailStatus: null,
+    visionRefusal: null,
     visionStallFirstMs: 0,
     verifyReply: {},
     upstashDown: false,
@@ -91,6 +94,7 @@ export async function startFakeServices(): Promise<FakeServices> {
       fake.store.clear();
       fake.visionItem = RESALE_ITEM;
       fake.visionFailStatus = null;
+      fake.visionRefusal = null;
       fake.visionStallFirstMs = 0;
       fake.verifyReply = {
         findings: "Comparable originals ask $90-150.",
@@ -177,6 +181,18 @@ export async function startFakeServices(): Promise<FakeServices> {
             return json(fake.visionFailStatus, {
               type: "error",
               error: { type: "invalid_request_error", message: "fake failure" },
+            });
+          }
+          if (fake.visionRefusal) {
+            return json(200, {
+              ...message("", { input_tokens: 1200, output_tokens: 5 }),
+              content: [],
+              stop_reason: "refusal",
+              stop_details: {
+                type: "refusal",
+                category: fake.visionRefusal,
+                explanation: "fake refusal",
+              },
             });
           }
           return json(
