@@ -87,6 +87,16 @@ const HEDGE_PATTERNS: RegExp[] = [
   /\b(?:inquire|message me|contact me|ask before (?:buying|purchasing)|ask for details)\b/i,
   /\b(?:exact|specific) (?:year|model|make|specs?|specifications?|size)\b[^.!?]*\bnot\b/i,
   /\b(?:unknown|unclear|undetermined|unverified)\b/i,
+  // The model explaining how it identified the item, or grading its own
+  // evidence: "The slim form factor is identifiable by its rounded top." Its
+  // reasoning, not a fact about the item, and the prompt's ban alone kept
+  // letting it through.
+  /\b(?:identifiable|recogni[sz]able|distinguishable) (?:by|from|as)\b/i,
+  /\bconsistent with (?:normal|regular|light|typical|everyday|moderate) (?:use|wear)\b/i,
+  // Reporting the absence of flaws: "shows no visible wear", "no signs of
+  // damage". General condition, which the prompt keeps out of the copy; a
+  // real flaw is disclosed on its own. "No band included" does not match.
+  /\bno (?:visible |obvious |noticeable )?(?:signs? of )?(?:wear|damage|scratches|scuffs|cracks|chips|dents|stains|flaws)\b/i,
 ];
 
 /**
@@ -102,4 +112,21 @@ export function dropHedges(text: string): string {
     .split(/(?<=[.!?])\s+/)
     .filter((sentence) => !HEDGE_PATTERNS.some((re) => re.test(sentence)));
   return kept.join(" ").trim();
+}
+
+/**
+ * The title's version of dropHedges: remove a segment that hedges the model
+ * ("— Series 3 or Later", ", or similar"). The prompt forbids it, but a title
+ * is the first thing a buyer reads, so it is enforced here too. Only whole
+ * trailing segments go — the part before the dash or comma is the name.
+ */
+const TITLE_HEDGE = /\bor (?:later|newer|earlier|older|similar)\b/i;
+
+export function dropTitleHedges(title: string): string {
+  const parts = title.split(/(\s+[—–-]\s+|,\s+)/);
+  // parts alternates text, separator, text, …; walk back from the end.
+  while (parts.length > 2 && TITLE_HEDGE.test(parts[parts.length - 1]!)) {
+    parts.splice(-2, 2);
+  }
+  return parts.join("").trim();
 }
