@@ -49,3 +49,12 @@ test("drops a sentence reporting no flaws, keeps what is included", () => {
     "Nintendo Switch OLED model in white. No band included.",
   );
 });
+
+test("drops general wear, keeps the specific flaw", () => {
+  assert.equal(
+    dropHedges(
+      "Akai MPK Mini USB MIDI keyboard controller in black. The unit shows general use wear including dust and light scuffing on the control surface. One knob cap (K5) is missing.",
+    ),
+    "Akai MPK Mini USB MIDI keyboard controller in black. One knob cap (K5) is missing.",
+  );
+});

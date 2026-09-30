@@ -97,6 +97,10 @@ const HEDGE_PATTERNS: RegExp[] = [
   // damage". General condition, which the prompt keeps out of the copy; a
   // real flaw is disclosed on its own. "No band included" does not match.
   /\bno (?:visible |obvious |noticeable )?(?:signs? of )?(?:wear|damage|scratches|scuffs|cracks|chips|dents|stains|flaws)\b/i,
+  // General wear, which the prompt also keeps out: "shows general use wear",
+  // "light signs of wear". A specific flaw ("One knob cap is missing.") is its
+  // own sentence and does not match.
+  /\b(?:general|normal|light|minor|typical|everyday|some) (?:use |signs of )?wear\b/i,
 ];
 
 /**
