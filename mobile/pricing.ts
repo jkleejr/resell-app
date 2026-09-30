@@ -81,6 +81,8 @@ const KNOWN_OTHER_SITES: Platform[] = [
   // Swappa: 3% of the price from the seller (the buyer pays their own 3%,
   // which doesn't change the seller's payout).
   { name: "Swappa", feePct: 0.03, flatFee: 0, shipping: "prepaid" },
+  // Discogs: 9% selling fee.
+  { name: "Discogs", feePct: 0.09, flatFee: 0, shipping: "prepaid" },
 ];
 
 function knownOtherSite(name: string): Platform | undefined {
