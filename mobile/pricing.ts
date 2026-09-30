@@ -102,7 +102,7 @@ export function speedLabel(speed: "fast" | "moderate" | "slow"): string {
     case "moderate":
       return "Usually sells within a couple of weeks.";
     case "slow":
-      return "May take a month or more — niche demand.";
+      return "May take a month or more.";
   }
 }
 
