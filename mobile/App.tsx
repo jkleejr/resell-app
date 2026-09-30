@@ -429,23 +429,23 @@ export default function App() {
 
   // How sure the app is, in two words, or nothing at all.
   //
-  // "certain" covers two cases: a number a web search actually refined —
+  // "Certain" covers two cases: a number a web search actually refined —
   // the only case where something outside the model's own memory backed the
   // price — and the model alone with all three of its own checks passed, the
   // same case that puts "Exact product match" under the price. The price
   // note underneath is what tells them apart, so the badge needn't.
-  // "pretty certain" is left for when a lookup ran and came back empty, so
-  // the grey note replaces that tick.
+  // "Pretty certain" is left for when a lookup ran and came back empty, so
+  // the amber note replaces that tick.
   // Deliberately not worded as sold-price evidence: the search reads asking
   // prices off live listings, and sold data is exactly what is NOT on the
   // open web (see shouldVerify in lib/handler.ts).
   const certainty = result
     ? result.priceBasis === "verified"
-      ? "certain"
+      ? "Certain"
       : confidentResale
         ? result.priceNote
-          ? "pretty certain"
-          : "certain"
+          ? "Pretty certain"
+          : "Certain"
         : null
     : null;
 
@@ -718,11 +718,11 @@ export default function App() {
                     always "generic" — a one-of-a-kind piece is never an exact
                     product — and originals are the only items that get
                     searched, so checking specificity first meant a searched
-                    price could never read "certain", and instead sat
-                    under a "best guess" badge. */}
+                    price could never read "Certain", and instead sat
+                    under a "Best guess" badge. */}
                 {result.priceBasis !== "verified" &&
                 result.specificity === "generic" ? (
-                  <Badge label="best guess" tone="caution" />
+                  <Badge label="Best guess" tone="caution" />
                 ) : certainty ? (
                   <Badge label={certainty} tone="confident" />
                 ) : null}
@@ -750,9 +750,9 @@ export default function App() {
                     {price.high}
                   </Text>
                   {/* One line under the price saying how much to trust it.
-                      Blue tick, matching the "certain" badge, when something
-                      backs the number, muted grey
-                      when a lookup came back empty, nothing at all when the
+                      Blue tick, matching the "Certain" badge, when something
+                      backs the number; amber, matching "Best guess", when a
+                      lookup came back empty or thin; nothing at all when the
                       model is working from a guess — silence is the honest
                       signal there, and the "generic" nudge above already says
                       how to improve it.
@@ -767,7 +767,7 @@ export default function App() {
                       style={
                         result.priceBasis === "verified"
                           ? styles.priceNote
-                          : styles.priceNoteMuted
+                          : styles.priceNoteCaution
                       }
                     >
                       {result.priceBasis === "verified" ? "✓ " : ""}
@@ -1326,8 +1326,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textTransform: "capitalize",
   },
-  badgeTextCaution: { color: "#F5D88A" },
-  badgeTextConfident: { color: "#7FBEF5" },
+  // The toned badges are phrases, spelled out exactly ("Best guess"), so they
+  // opt out of the title-casing the category and condition badges rely on.
+  badgeTextCaution: { color: "#F5D88A", textTransform: "none" },
+  badgeTextConfident: { color: "#7FBEF5", textTransform: "none" },
   brandLine: { color: "#C8C8D0", fontSize: 15 },
   keywords: { color: "#7A7A86", fontSize: 13 },
   nudge: {
@@ -1349,9 +1351,10 @@ const styles = StyleSheet.create({
   },
   price: { color: "#fff", fontSize: 38, fontWeight: "800" },
   priceRange: { color: "#fff", fontSize: 15 },
-  // Same blue as the "certain" badge — this line means "we checked".
+  // Same blue as the "Certain" badge — this line means "we checked".
   priceNote: { color: "#7FBEF5", fontSize: 13, marginTop: 8 },
-  priceNoteMuted: { color: "#8A8A93", fontSize: 13, marginTop: 8 },
+  // Same amber as the "Best guess" badge — we looked, but not enough to lean on.
+  priceNoteCaution: { color: "#F5D88A", fontSize: 13, marginTop: 8 },
   recLead: { color: "#fff", fontSize: 17, fontWeight: "700" },
   reason: { color: "#C8C8D0", fontSize: 14, lineHeight: 20 },
   speed: { color: "#C8C8D0", fontSize: 14, lineHeight: 20, marginBottom: 6 },
