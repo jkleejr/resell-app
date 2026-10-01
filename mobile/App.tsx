@@ -31,7 +31,6 @@ import {
 } from "./pricing";
 import {
   DEFAULT_SETTINGS,
-  loadSettings,
   saveSettings,
   type Settings,
 } from "./settings";
@@ -160,7 +159,9 @@ export default function App() {
   useEffect(() => {
     void fetchStats();
     void loadHistory().then(setHistory);
-    void loadSettings().then(setSettings);
+    // Settings is off the home screen for now, so nothing opens that page.
+    // Saved picks are left in storage but not loaded: every scan runs on the
+    // defaults, rather than on a choice the seller can no longer change.
   }, []);
 
   function updateSettings(next: Settings) {
@@ -558,17 +559,6 @@ export default function App() {
         {status !== "done" && (
           <View style={styles.headerRow}>
             <Text style={styles.brand}>Loot Check</Text>
-            {/* Settings from the home screen only, never mid-scan. */}
-            {status === "idle" && images.length === 0 && (
-              <Pressable
-                onPress={() => setScreen("settings")}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="Settings"
-              >
-                <Ionicons name="settings-outline" size={26} color="#A8A8B0" />
-              </Pressable>
-            )}
           </View>
         )}
         {/* The pitch is for the start screens only. Once a scan is under way
