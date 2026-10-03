@@ -563,11 +563,14 @@ export default function App() {
           </View>
         )}
         {/* The pitch is for the start screens only. Once a scan is under way
-            or showing, the photo and result should sit right under the name. */}
+            or showing, the photo and result should sit right under the name.
+            Once a photo is in, the pitch has done its job, so the line says
+            what to do next instead. */}
         {status !== "working" && status !== "done" && (
           <Text style={styles.tagline}>
-            Snap something you want to sell. We'll tell you what it is, what
-            it's worth, and where to sell it.
+            {status === "idle" && images.length > 0
+              ? `Identify now, take another photo, or add from library. Up to ${MAX_IMAGES} photos.`
+              : "Snap something you want to sell. We'll tell you what it is, what it's worth, and where to sell it."}
           </Text>
         )}
 
