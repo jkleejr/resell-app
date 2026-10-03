@@ -923,9 +923,6 @@ export default function App() {
               </Text>
             ) : (
               <>
-                <Text style={styles.hintTip}>
-                  Saved on this phone only. Swipe left on a scan to delete it.
-                </Text>
                 <ScrollView
                   style={styles.historyList}
                   contentContainerStyle={styles.historyListContent}
