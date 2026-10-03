@@ -117,6 +117,9 @@ export type CraftLevel = (typeof CRAFT_LEVEL)[number];
 
 export interface AnalyzeResult {
   title: string;
+  /** The language the item's own text was translated from to write the title,
+   *  in English ("Japanese"). "" when nothing needed translating. */
+  translatedFrom: string;
   category: Category;
   /** Brand name, or "" when not confidently identifiable. */
   brand: string;
@@ -231,6 +234,7 @@ export const ANALYZE_SCHEMA = {
   additionalProperties: false,
   properties: {
     title: { type: "string" },
+    translatedFrom: { type: "string" },
     category: { type: "string", enum: [...CATEGORIES] },
     brand: { type: "string" },
     condition: { type: "string", enum: [...CONDITIONS] },
@@ -259,6 +263,7 @@ export const ANALYZE_SCHEMA = {
   },
   required: [
     "title",
+    "translatedFrom",
     "category",
     "brand",
     "condition",

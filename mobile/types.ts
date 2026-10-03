@@ -1,6 +1,9 @@
 // Mirrors the backend /api/analyze contract (lib/schema.ts).
 export type AnalyzeResult = {
   title: string;
+  /** The language the title was translated from ("Japanese"), or "". Missing
+   *  from older backends and from scans saved before it existed. */
+  translatedFrom?: string;
   category: string;
   brand: string;
   condition: string;

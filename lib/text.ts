@@ -134,3 +134,17 @@ export function dropTitleHedges(title: string): string {
   }
   return parts.join("").trim();
 }
+
+// A language name the app shows as a badge, so it must be one: a word or two of
+// letters, never English (nothing was translated), never a sentence. Anything
+// else is blank — a missing badge costs nothing, a wrong one is on screen.
+export function cleanLanguage(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const name = cleanText(value).replace(/\.$/, "");
+  if (!/^[A-Za-z][A-Za-z'-]*( [A-Za-z][A-Za-z'-]*)?$/.test(name)) return "";
+  if (/^(english|none|n\/?a|unknown)$/i.test(name)) return "";
+  return name
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}

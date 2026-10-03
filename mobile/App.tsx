@@ -707,6 +707,11 @@ export default function App() {
                 <Badge
                   label={CONDITION_LABELS[result.condition] ?? result.condition}
                 />
+                {/* The title is a translation, so say from what: a seller
+                    holding a Japanese snack can check it against the bag. */}
+                {result.translatedFrom ? (
+                  <Badge label={result.translatedFrom} />
+                ) : null}
                 {/* Three states, and only two of them say anything. "best
                     guess" when the product was never pinned down; a blue
                     certainty badge when it was AND the price has something

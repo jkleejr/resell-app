@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dropHedges, dropTitleHedges } from "../lib/text.js";
+import { cleanLanguage, dropHedges, dropTitleHedges } from "../lib/text.js";
 
 test("drops a sentence explaining how the item was identified", () => {
   assert.equal(
@@ -66,4 +66,19 @@ test("drops wear explained away as use", () => {
     ),
     "Akai MPK Mini 25-key USB MIDI keyboard controller in black.",
   );
+});
+
+test("keeps a language name for the translated-from badge", () => {
+  assert.equal(cleanLanguage("Japanese"), "Japanese");
+  assert.equal(cleanLanguage("traditional chinese"), "Traditional Chinese");
+  assert.equal(cleanLanguage(" Korean. "), "Korean");
+});
+
+test("blanks the badge when nothing was translated or the value isn't a language", () => {
+  assert.equal(cleanLanguage(""), "");
+  assert.equal(cleanLanguage("English"), "");
+  assert.equal(cleanLanguage("none"), "");
+  assert.equal(cleanLanguage("N/A"), "");
+  assert.equal(cleanLanguage("The label is in Japanese"), "");
+  assert.equal(cleanLanguage(42), "");
 });

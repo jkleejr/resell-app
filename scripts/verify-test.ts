@@ -24,6 +24,7 @@ function fakeResult(
 ): AnalyzeResult {
   return {
     title,
+    translatedFrom: "",
     category: "other",
     brand: "",
     condition: basis === "original" ? "new" : "good",

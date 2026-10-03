@@ -13,7 +13,13 @@ import {
   type MediaType,
   type PlatformName,
 } from "./schema.js";
-import { cleanText, completeSentences, dropHedges, dropTitleHedges } from "./text.js";
+import {
+  cleanLanguage,
+  cleanText,
+  completeSentences,
+  dropHedges,
+  dropTitleHedges,
+} from "./text.js";
 
 // Sonnet 5.5 is the default: vision-capable, supports structured outputs, and
 // cheap enough to run per-scan. Override with the MODEL env var to A/B test
@@ -104,6 +110,7 @@ Rules:
   • The exact model is what buyers search for, so put it in the title whenever you can determine it: the model name or number, the generation or version ("MK3", "Series 7", "3rd Gen", "V2"), and the one spec that splits the product line — key count, storage, screen size, capacity. "Apple AirPods Pro 2nd Generation with USB-C Case" beats "Apple AirPods Wireless Earbuds, White"; the first is the listing buyers find, the second matches every generation at once. Count what can be counted.
   • Every word of the title must be something you are sure of. A spec you would have to estimate — a case or screen size with nothing in the photo to measure it against, a capacity or clothing size that isn't printed anywhere you can read — stays out. Never give two options ("42mm/44mm", "64GB or 128GB"): that is a guess, and a buyer who receives the other one returns it. Put in what you know, leave out what you don't, and the title is exactly as specific as the photo allows. The same goes for ranges and qualifiers — "Series 3 or Later", "or similar", "Type", "Style" — and for tacking on a feature to stand in for the model you couldn't name ("— Front LCD Display Model"): end the title at the last thing you know.
   • Many product lines come in look-alike generations. Tell them apart by what actually differs between them — a display or none, the type of knob or joystick, the ports, the printed model or generation mark — not by the overall look. If you cannot tell which generation it is, name the line without one; a wrong generation misleads the buyer and gets the item returned.
+- translatedFrom: when the item's own name — the product name, brand, or label text you used for the title — is written in a language other than English and you translated it to write the title, name that language in English: "Japanese", "Korean", "French". Otherwise "". Romanising a brand ("Calbee", "Jagapokkuru") counts as translating it. A foreign word that is simply part of an English product name ("Häagen-Dazs", "Le Creuset"), or incidental small print on an item whose name is English, does not; leave it "".
 - category: choose the single best fit from the allowed set. Use "jewelry" for bracelets, necklaces, rings, earrings, and watches; use "accessory" for bags, belts, wallets, sunglasses, hats, and scarves. Reserve "clothing" for worn garments. Use "collectible" for anything valued for its age, rarity, or collecting interest: antiques, coins, stamps, trading cards, figurines, vintage toys, memorabilia, antique china and glassware.
 - brand: the brand name ONLY if you can identify it with high confidence from a visible logo, label, or unmistakable design. If you are not confident, return an empty string "". Never guess a brand.
 - condition: estimate from visible wear. Default to "good" for a normal used item with no visible damage. Use "new"/"like_new" only with clear evidence (tags attached, pristine surfaces); use "fair"/"poor" only for visible damage or heavy wear. A newly made original piece is "new" — but do not lean on condition when pricing it, since it carries no information there.
@@ -374,6 +381,7 @@ function normalize(raw: unknown, markets: Marketplaces): AnalyzeResult {
 
   return {
     title,
+    translatedFrom: cleanLanguage(r.translatedFrom),
     category,
     brand: cleanBrand(r.brand),
     condition,
