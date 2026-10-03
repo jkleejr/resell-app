@@ -28,56 +28,132 @@ Required for every update; it's the one listing field a new version forces you t
 
 ```
 - Your past scans are now saved in History on the home screen
-- New Settings: choose which marketplaces you sell on
-- Etsy and StockX added
 - Where to sell now shows only the marketplaces that fit your item
+- Etsy, StockX, Reverb, The RealReal and more added
 - Cancel a scan while it's identifying
-- Tap the camera square to add more photos
-- Swipe left to delete a past scan
-- Cleaner results page
+- Cleaner results page and sharper listings
+- Bug fixes
 ```
 
-> Kept short and casual to match the notes live on the App Store.
 
 ### Release-note history
 
-- **1.0.5** — scan history on the home screen (saved on the device only), with
-  swipe-to-delete and retry from a past scan; cancel a scan mid-identify; a
-  camera slot in place of "Add another photo"; a Settings page to choose
-  marketplaces, with Etsy and StockX added and "Loot Check decides" letting the
-  AI suggest any site; Where to sell lists only the marketplaces that suit the
-  item (needs the matching backend deploy); results page restyled.
-  Needs a new binary: history adds expo-file-system (native).
-  Notes as pasted: see the block above.
-- **1.0.4** — asks for an App Store rating (Apple's native sheet) after the
-  10th successful scan, then at most once per 30 days. Also: the scanned photos
-  stay above a failed scan's error, the verified-scan wait estimate is ~25s,
-  and a revised icon (larger tag). Notes as pasted:
-  "Photos stay on screen if a scan fails / More accurate wait time estimates /
-  Updated app icon".
-- **1.0.3** — released 4 Sep 2026. Notes as live on the App Store:
-  "Improved listing descriptions - Added high confidence labels - Added web
-  searches - Displays wait time estimates". Detail: original/handmade valuation surfaced in the UI: originals show
-  "Estimated value" rather than a resale price, prices can carry a provenance
-  line, and hitting the daily cap now actually stops further scans instead of
-  offering a retry that cannot succeed. The valuation itself shipped earlier via
-  the backend and is already live for 1.0.x installs; this build is what makes it
-  legible on screen.
+#### 1.0.5
 
-  Listing quality, added after build 9 was uploaded: descriptions no longer
-  arrive truncated (`cleanText` now strips U+0085 and the rest of the C1 and
-  zero-width families, and an over-long response fails the scan instead of
-  going out half-written), titles name the item rather than narrating the
-  photo, hedges and buyer-directed caveats are stripped in code by `dropHedges`
-  rather than merely discouraged in the prompt, the badge row can now say
-  "pretty certain" / "very certain" instead of only flagging a best guess, and
-  the wait carries a measured estimate that relabels itself when the price
-  check runs long.
-- **1.0.2** — new app icon (second revision of the scan-tag mark).
-- **1.0.1** — new icon + launch screen; price now renders instantly on-device
-  (the sold-comps lookup that never shipped was removed along with its caption).
-  Approved and released 29 Aug 2026.
-- **1.0.0** — initial release.
+Notes as pasted: see the What's New block above.
+
+**New**
+- Scan history on the home screen, above the photo buttons (saved on the device only)
+- Swipe left to delete a past scan, or retry it
+- Cancel a scan while it's identifying
+- A camera square in place of "Add another photo"; scans capped at 3 photos, on a single row
+
+**Where to sell**
+- Ranks the marketplaces worth listing on, and shows only the ones that suit the item
+- Added Etsy, StockX, Reverb, The RealReal, Discogs and Swappa
+- Fee fixes: Depop's processing fee, StockX a flat 12%, Grailed priced by value
+- "Local" or "Ship" for sites with no fee table
+- Collectible prices checked against WorthPoint
+
+**Results page**
+- Restyled, and opens on the photo
+- "Certain" beside an exact product match
+- The price check says how much it found (none / a few / enough)
+- "Of similar items" when a price comes from comparable listings
+- Shorter sell-speed lines
+
+**Listings**
+- Exact model in the title
+- Visible flaws disclosed; general-wear sentences dropped
+- Translated titles tagged with the source language
+
+**Compose screen**
+- Buttons pinned to the bottom
+- A next-step prompt once a photo is attached
+
+**Fixes**
+- Tapping Scan another at the bottom of a long result left the home screen
+  blank, scrolled past its content with no way back
+- Coming back from a long result could push Take a photo and Choose from
+  library off the bottom of the home screen
+- With the keyboard up, the first tap on Identify only closed the keyboard;
+  it now starts the scan on the first tap
+- A denied camera or photo permission silently did nothing; it now offers to
+  open Settings
+- Errors while processing a photo were swallowed; they now show on the
+  compose screen
+- Long screenshots failed every scan (too tall for the API); they're now
+  capped at 2048px tall
+- No connection showed "Network request failed"; it now says to check your
+  connection
+- Poshmark charged 20% on items under $15; it's a flat $2.95 there
+- "Copied" vanished early when copying the title and then the description
+- Listing cleanup cut good copy ("made for everyday wear", names like
+  "Unknown Pleasures") and trimmed at decimal points ("with a 3.")
+- The detail field's character limit now fits its box (~45 characters on a
+  large phone)
+
+**Backend**
+- Scans and price checks moved to Sonnet 5.5
+- Refused scans and retries logged as their own outcomes
+
+**Ship notes**
+- Settings (choose marketplaces, "Loot Check decides") was built but taken off
+  the home screen on 1 Oct 2026, so every scan runs on the default marketplaces
+- Needs a new binary: history adds expo-file-system (native)
+- Needs the matching backend deploy (live as of 3 Oct 2026)
+
+#### 1.0.4
+
+Notes as pasted: "Photos stay on screen if a scan fails / More accurate wait
+time estimates / Updated app icon"
+
+- Asks for an App Store rating (Apple's native sheet) after the 10th successful
+  scan, then at most once per 30 days
+- Scanned photos stay above a failed scan's error
+- Verified-scan wait estimate is ~25s
+- Revised icon (larger tag)
+
+#### 1.0.3
+
+Released 4 Sep 2026. Notes as live on the App Store: "Improved listing
+descriptions - Added high confidence labels - Added web searches - Displays
+wait time estimates"
+
+**Valuation on screen**
+- Originals/handmade items show "Estimated value" rather than a resale price
+- Prices can carry a provenance line
+- Hitting the daily cap stops further scans instead of offering a retry that
+  can't succeed
+- The valuation itself shipped earlier via the backend and is live for 1.0.x
+  installs; this build makes it legible on screen
+
+**Listing quality** (added after build 9 was uploaded)
+- Descriptions no longer arrive truncated: `cleanText` strips U+0085 and the
+  rest of the C1 and zero-width families, and an over-long response fails the
+  scan instead of going out half-written
+- Titles name the item rather than narrating the photo
+- Hedges and buyer-directed caveats are stripped in code by `dropHedges`, not
+  just discouraged in the prompt
+- The badge row can say "pretty certain" / "very certain", not only flag a best guess
+- The wait carries a measured estimate that relabels itself when the price
+  check runs long
+
+#### 1.0.2
+
+- New app icon (second revision of the scan-tag mark)
+
+#### 1.0.1
+
+Approved and released 29 Aug 2026.
+
+- New icon and launch screen
+- Price renders instantly on-device (the sold-comps lookup that never shipped
+  was removed, along with its caption)
+
+#### 1.0.0
+
+- Initial release
 
 ## Description (max 4000)
 
@@ -102,10 +178,11 @@ HOW IT WORKS
 FEATURES
 • AI photo identification — brand, item type, and condition from a single picture
 • Estimated resale value, instantly
-• Marketplace recommendations across eBay, Poshmark, Mercari, Depop, Vinted, Facebook Marketplace, and OfferUp
+• Marketplace recommendations matched to each item — eBay, Facebook Marketplace, Etsy, Poshmark, Mercari, OfferUp, Depop, Vinted, StockX, The RealReal, Reverb, and more
 • Fee-aware payout comparison so you can see where you net the most
 • Auto-generated listing title and description
 • Add a hint or extra photos for hard-to-identify items
+• Scan history saved on your phone — retry or delete past scans anytime
 • No account, no sign-up — just open and scan
 
 A NOTE ON PRICES
@@ -131,22 +208,29 @@ things a new version actually makes you handle:
       `autoIncrement` bumps it on the next production build. Don't set it by hand.
 - [ ] **Previous version out of review** — App Store Connect will not accept 1.0.5 while 1.0.4
       is still `Waiting for Review` or `In Review`. Check before submitting.
-- [ ] **Deploy the backend first** — 1.0.5's per-item Where to sell and "Loot Check
-      decides" need it. It's safe for older installs: they send no marketplace list
-      and keep getting the original seven.
+- [x] **Deploy the backend first** — done; production was deployed 3 Oct 2026 after
+      the last backend commit. 1.0.5's per-item Where to sell needs it: with Settings
+      hidden, every scan sends all the marketplaces and lets Loot Check suggest
+      others. It's safe for older installs: they send no marketplace list and keep
+      getting the original seven. Re-check if `lib/` or `api/` changes before submitting.
 - [ ] **New build** — 1.0.5 adds a native module (expo-file-system, for scan history),
       so it can only ship as a new binary; an OTA update can't carry it.
       `eas build -p ios --profile production`, then `eas submit -p ios`.
 - [ ] **What's New** — paste the block above. Mandatory field on every update.
-- [ ] **Screenshots** — not required to change. The result screen now reads
-      "Estimated value" for originals and can show a provenance line under the
-      price, but existing screenshots show a resale item, which still matches.
-      (Screenshot 3 may still show the removed price caption from before 1.0.1 —
-      worth a look, but not a blocker.)
+- [ ] **Description** — paste the updated block above (adds scan history and the
+      new marketplaces).
+- [ ] **Screenshots** — retake the home screen (`docs/screenshots/01-home.png`).
+      It shows the Settings gear, which this build doesn't have (App Review can
+      flag screenshots of missing features). It's also out of date on smaller
+      points: the 🛍 emoji on the scan counter is gone, History now sits above the
+      photo buttons, and the "Saved on this phone only…" hint is gone.
+      Where to sell (`04-where.png`) still shows the removed BEST tag — minor,
+      retake if convenient.
 - [ ] **Export compliance** — already declared in `app.json`
       (`ITSAppUsesNonExemptEncryption: false`), so App Store Connect won't re-ask.
-- [ ] **App Privacy** — unchanged. No new data is collected in this version; the
-      two-item answer below still matches the app's behaviour.
+- [ ] **App Privacy** — unchanged. No new data is collected in this version (scan
+      history stays on the device); the two-item answer below still matches the
+      app's behaviour.
 - [ ] **Age rating questionnaire** — Apple replaced this in 2025 and required every
       app to re-answer it by 31 Jan 2026 or be blocked from submitting updates. If
       the 1.0.0 submission predates your answering it, App Store Connect will make
