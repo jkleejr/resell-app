@@ -4,6 +4,7 @@ import {
   Alert,
   Animated,
   Image,
+  Linking,
   PanResponder,
   Pressable,
   SafeAreaView,
@@ -87,6 +88,12 @@ type Screen = "home" | "settings";
 // dramatically improves identification. The backend handler still accepts
 // up to 4 so App Store builds from before this cap was lowered keep working.
 const MAX_IMAGES = 3;
+// Photos are sent 1024 wide, which keeps an ordinary portrait shot at 1024x1365.
+// A long screenshot at that width can run past 8000px tall — over the API's
+// limit, so every scan of it fails — so its height is capped here instead.
+const MAX_PHOTO_HEIGHT = 2048;
+// Matches the backend's MAX_HINT_CHARS, which trims anything longer.
+const MAX_HINT_CHARS = 200;
 // Space between the photos on the compose screen.
 const THUMB_GAP = 14;
 
@@ -110,6 +117,21 @@ function fallbackError(status: number): string {
     return "That took longer than expected. Please try again.";
   }
   if (status >= 500) return "Something went wrong on our end. Please try again.";
+  return "Something went wrong. Please try again.";
+}
+
+// A failed response, carrying words meant for the user.
+class ServerError extends Error {}
+
+// Only the server's own messages are shown as they are. Anything else is the
+// platform talking — fetch throws a TypeError reading "Network request failed"
+// when there is no connection, and a garbled body throws a JSON parse error —
+// and neither is something to put in front of a seller.
+function scanErrorMessage(e: unknown): string {
+  if (e instanceof ServerError) return e.message;
+  if (e instanceof TypeError) {
+    return "Couldn't reach Loot Check. Check your connection and try again.";
+  }
   return "Something went wrong. Please try again.";
 }
 
@@ -217,10 +239,17 @@ export default function App() {
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError(
+      // iOS asks only once. After a "Don't Allow" the request above returns
+      // straight away without a prompt, so the only way back in is Settings.
+      Alert.alert(
+        source === "camera" ? "Camera access is off" : "Photo access is off",
         source === "camera"
-          ? "Camera permission is needed to take a photo."
-          : "Photo library permission is needed to pick a photo.",
+          ? "Allow camera access in Settings to take a photo."
+          : "Allow photo access in Settings to pick a photo.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => void Linking.openSettings() },
+        ],
       );
       return;
     }
@@ -241,9 +270,14 @@ export default function App() {
     try {
       const shrunk = await Promise.all(
         assets.map(async (asset) => {
+          // 1024 wide, unless that leaves it taller than MAX_PHOTO_HEIGHT (a
+          // long screenshot), which the API would reject outright.
+          const tall =
+            asset.width > 0 &&
+            (asset.height / asset.width) * 1024 > MAX_PHOTO_HEIGHT;
           const s = await manipulateAsync(
             asset.uri,
-            [{ resize: { width: 1024 } }],
+            [{ resize: tall ? { height: MAX_PHOTO_HEIGHT } : { width: 1024 } }],
             { compress: 0.7, format: SaveFormat.JPEG, base64: true },
           );
           if (!s.base64) throw new Error("Could not read the image data.");
@@ -309,7 +343,7 @@ export default function App() {
         // retry that cannot succeed — every further attempt would just be a
         // round trip to the same refusal.
         if (res.status === 429) setLimitReached(true);
-        throw new Error(body.error ?? fallbackError(res.status));
+        throw new ServerError(body.error ?? fallbackError(res.status));
       }
 
       const data = (await res.json()) as AnalyzeResult;
@@ -326,9 +360,7 @@ export default function App() {
     } catch (e) {
       // Cancelled: cancelScan already put the screen back.
       if (controller.signal.aborted) return;
-      setError(
-        e instanceof Error ? e.message : "Something went wrong. Try again.",
-      );
+      setError(scanErrorMessage(e));
       setStatus("error");
     }
   }
@@ -612,6 +644,14 @@ export default function App() {
           </View>
         )}
 
+        {/* A photo that couldn't be added. Scan errors have their own screen
+            below; this is the only other place an error can come from. */}
+        {status === "idle" && error && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         {/* Compose: thumbnails + hint (idle only) */}
         {status === "idle" && images.length > 0 && (
           <>
@@ -669,6 +709,7 @@ export default function App() {
                 placeholderTextColor="#6A6A76"
                 value={hint}
                 onChangeText={setHint}
+                maxLength={MAX_HINT_CHARS}
                 returnKeyType="done"
               />
               <Text style={styles.hintTip}>
@@ -1042,7 +1083,13 @@ function Page({
     );
   }
   return (
-    <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
+    <ScrollView
+      ref={scrollRef}
+      contentContainerStyle={styles.container}
+      // With the keyboard up after typing a detail, a tap on Identify should
+      // identify — not just put the keyboard away and need a second tap.
+      keyboardShouldPersistTaps="handled"
+    >
       {children}
     </ScrollView>
   );
