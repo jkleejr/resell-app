@@ -627,7 +627,7 @@ export default function App() {
         {status !== "working" && status !== "done" && (
           <Text style={styles.tagline}>
             {status === "idle" && images.length > 0
-              ? `Identify now, take another photo, or add from library. Up to ${MAX_IMAGES} photos.`
+              ? `Identify, take another photo, or add from library. Up to ${MAX_IMAGES} photos.`
               : "Snap something you want to sell. We'll tell you what it is, what it's worth, and where to sell it."}
           </Text>
         )}
