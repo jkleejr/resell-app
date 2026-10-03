@@ -13,6 +13,7 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -86,6 +87,8 @@ type Screen = "home" | "settings";
 // dramatically improves identification. The backend handler still accepts
 // up to 4 so App Store builds from before this cap was lowered keep working.
 const MAX_IMAGES = 3;
+// Space between the photos on the compose screen.
+const THUMB_GAP = 14;
 
 const CONDITION_LABELS: Record<string, string> = {
   new: "New",
@@ -114,6 +117,14 @@ export default function App() {
   const [status, setStatus] = useState<Status>("idle");
   const [elapsed, setElapsed] = useState(0);
   const [images, setImages] = useState<CapturedImage[]>([]);
+  // Compose photos are sized so MAX_IMAGES of them span the content width
+  // exactly (the page has 24pt padding each side), whatever the phone.
+  const { width: screenWidth } = useWindowDimensions();
+  const thumbSize = Math.floor(
+    (screenWidth - 48 - THUMB_GAP * (MAX_IMAGES - 1)) / MAX_IMAGES,
+  );
+  // The empty slot stays a little smaller than a photo, as it always was.
+  const addSlotSize = Math.round((thumbSize * 80) / 96);
   const [hint, setHint] = useState("");
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -604,19 +615,25 @@ export default function App() {
         {/* Compose: thumbnails + hint (idle only) */}
         {status === "idle" && images.length > 0 && (
           <>
-            {/* One row: three photos (3 × 96 + 2 × 12 = 312pt) fit inside
-                the 327pt content width of the smallest current iPhone. The
-                empty slot for the next photo sits right after the last one.
+            {/* One row of three photos, sized to reach both edges of the
+                content area. The empty slot for the next photo sits right
+                after the last one.
                 The grid keeps the height of the old two-row layout, so the
                 detail field below stays where it always was, and the row is
                 centred in it. */}
             <View style={styles.thumbGrid}>
-              <View style={styles.thumbGridRow}>
+              <View style={[styles.thumbGridRow, { height: thumbSize }]}>
                 {(images.length < MAX_IMAGES ? [...images, null] : images).map(
                   (img, i) =>
                     img ? (
                       <View key={img.uri} style={styles.thumbWrap}>
-                        <Image source={{ uri: img.uri }} style={styles.thumb} />
+                        <Image
+                          source={{ uri: img.uri }}
+                          style={[
+                            styles.thumb,
+                            { width: thumbSize, height: thumbSize },
+                          ]}
+                        />
                         <Pressable
                           onPress={() => removeImage(i)}
                           style={styles.thumbRemove}
@@ -633,6 +650,7 @@ export default function App() {
                         accessibilityLabel="Take another photo"
                         style={({ pressed }) => [
                           styles.addSlot,
+                          { width: addSlotSize, height: addSlotSize },
                           pressed && styles.pressed,
                         ]}
                       >
@@ -1274,13 +1292,11 @@ const styles = StyleSheet.create({
   thumbGridRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    height: 96,
+    gap: THUMB_GAP,
   },
   // A little smaller than a photo, so it reads as a slot rather than one more.
+  // Sized in the component (addSlotSize).
   addSlot: {
-    width: 80,
-    height: 80,
     borderRadius: 12,
     borderWidth: 1.5,
     borderStyle: "dashed",
