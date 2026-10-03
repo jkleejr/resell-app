@@ -349,7 +349,6 @@ export default function App() {
     reset();
     if (photo) setImages([photo]);
     setComposeAttempt("add_photo");
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
   }
 
   // Full reset — clear everything for a brand-new item.
@@ -362,6 +361,12 @@ export default function App() {
     setResult(null);
     setError(null);
     setCopiedField(null);
+    // Every way out of a page lands at the top of the next one. Leaving a
+    // result from "Scan another" at the bottom would otherwise keep that
+    // offset on a home screen too short to show anything there, and home
+    // can't be scrolled back up, so it sat blank. Opening a saved scan from
+    // the history list, below the fold, would open the result partway down.
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
   }
 
   // Show a past scan on the same result screen a live one uses.
@@ -370,9 +375,6 @@ export default function App() {
     setViewingSaved(scan);
     setResult(scan.result);
     setStatus("done");
-    // The list sits below the fold, so the scroll offset would otherwise open
-    // the result partway down.
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
   }
 
   // No confirmation: swiping the row open and then tapping Delete is already
