@@ -83,9 +83,9 @@ type Status = "idle" | "working" | "done" | "error";
 type Screen = "home" | "settings";
 
 // Up to this many photos per scan — an overall shot plus a logo/label close-up
-// dramatically improves identification. Keep in sync with MAX_IMAGES in the
-// backend handler.
-const MAX_IMAGES = 4;
+// dramatically improves identification. The backend handler still accepts
+// up to 4 so App Store builds from before this cap was lowered keep working.
+const MAX_IMAGES = 3;
 
 const CONDITION_LABELS: Record<string, string> = {
   new: "New",
@@ -601,44 +601,40 @@ export default function App() {
         {/* Compose: thumbnails + hint (idle only) */}
         {status === "idle" && images.length > 0 && (
           <>
-            {/* Two per row, so all four photos fit on any phone. The empty
-                slot for the next photo takes the next free spot. Always two
-                photo-height rows, so the detail field below never moves as
-                photos come and go. */}
+            {/* One row: three photos (3 × 96 + 2 × 12 = 312pt) fit inside
+                the 327pt content width of the smallest current iPhone. The
+                empty slot for the next photo sits right after the last one.
+                Always one photo-height row, so the detail field below never
+                moves as photos come and go. */}
             <View style={styles.thumbGrid}>
-              {pairs(
-                images.length < MAX_IMAGES ? [...images, null] : images,
-              ).map((pair, r) => (
-                <View key={r} style={styles.thumbGridRow}>
-                  {pair.map((img, c) =>
-                    img ? (
-                      <View key={img.uri} style={styles.thumbWrap}>
-                        <Image source={{ uri: img.uri }} style={styles.thumb} />
-                        <Pressable
-                          onPress={() => removeImage(r * 2 + c)}
-                          style={styles.thumbRemove}
-                          hitSlop={8}
-                        >
-                          <Text style={styles.thumbRemoveText}>×</Text>
-                        </Pressable>
-                      </View>
-                    ) : (
+              {(images.length < MAX_IMAGES ? [...images, null] : images).map(
+                (img, i) =>
+                  img ? (
+                    <View key={img.uri} style={styles.thumbWrap}>
+                      <Image source={{ uri: img.uri }} style={styles.thumb} />
                       <Pressable
-                        key="add"
-                        onPress={() => addPhoto("camera")}
-                        accessibilityRole="button"
-                        accessibilityLabel="Take another photo"
-                        style={({ pressed }) => [
-                          styles.addSlot,
-                          pressed && styles.pressed,
-                        ]}
+                        onPress={() => removeImage(i)}
+                        style={styles.thumbRemove}
+                        hitSlop={8}
                       >
-                        <Ionicons name="camera-outline" size={28} color="#6A6A76" />
+                        <Text style={styles.thumbRemoveText}>×</Text>
                       </Pressable>
-                    ),
-                  )}
-                </View>
-              ))}
+                    </View>
+                  ) : (
+                    <Pressable
+                      key="add"
+                      onPress={() => addPhoto("camera")}
+                      accessibilityRole="button"
+                      accessibilityLabel="Take another photo"
+                      style={({ pressed }) => [
+                        styles.addSlot,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Ionicons name="camera-outline" size={28} color="#6A6A76" />
+                    </Pressable>
+                  ),
+              )}
             </View>
 
             <View style={styles.hintWrap}>
@@ -1020,13 +1016,6 @@ function Page({
   );
 }
 
-// [a, b, c] -> [[a, b], [c]]
-function pairs<T>(items: T[]): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += 2) out.push(items.slice(i, i + 2));
-  return out;
-}
-
 // Neutral by default. The two tinted tones are the only place the app states
 // how much to trust what it just told you: amber when it is guessing, blue when
 // it is not. Nothing in between gets a badge — see the badge row for why.
@@ -1265,12 +1254,12 @@ const styles = StyleSheet.create({
   },
   thumbRow: { gap: 10, paddingVertical: 2, alignItems: "center" },
   thumbWrap: { position: "relative" },
-  thumbGrid: { gap: 12, paddingTop: 6, height: 6 + 96 * 2 + 12 },
-  thumbGridRow: {
+  thumbGrid: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    height: 96,
+    paddingTop: 6,
+    height: 6 + 96,
   },
   // A little smaller than a photo, so it reads as a slot rather than one more.
   addSlot: {
