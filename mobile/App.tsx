@@ -930,7 +930,15 @@ export default function App() {
           </View>
         )}
 
-        <View style={styles.actions}>
+        {/* While composing, the buttons sit at the bottom of the screen like
+            they do on home, so "Start over" lands exactly where "Choose from
+            library" was. */}
+        <View
+          style={[
+            styles.actions,
+            status === "idle" && images.length > 0 && styles.actionsPinned,
+          ]}
+        >
           {status === "idle" &&
             (images.length === 0 ? (
               <>
@@ -1446,6 +1454,7 @@ const styles = StyleSheet.create({
   limitBox: { backgroundColor: "#2A2416", borderRadius: 14, padding: 16 },
   limitText: { color: "#F5D68A", fontSize: 15, lineHeight: 21 },
   actions: { gap: 12, marginTop: 8 },
+  actionsPinned: { marginTop: "auto" },
   primaryBtn: {
     backgroundColor: "#fff",
     borderRadius: 16,
