@@ -604,37 +604,39 @@ export default function App() {
             {/* One row: three photos (3 × 96 + 2 × 12 = 312pt) fit inside
                 the 327pt content width of the smallest current iPhone. The
                 empty slot for the next photo sits right after the last one.
-                Always one photo-height row, so the detail field below never
-                moves as photos come and go. */}
+                The grid keeps the height of the old two-row layout, so the
+                detail field below stays where it always was. */}
             <View style={styles.thumbGrid}>
-              {(images.length < MAX_IMAGES ? [...images, null] : images).map(
-                (img, i) =>
-                  img ? (
-                    <View key={img.uri} style={styles.thumbWrap}>
-                      <Image source={{ uri: img.uri }} style={styles.thumb} />
+              <View style={styles.thumbGridRow}>
+                {(images.length < MAX_IMAGES ? [...images, null] : images).map(
+                  (img, i) =>
+                    img ? (
+                      <View key={img.uri} style={styles.thumbWrap}>
+                        <Image source={{ uri: img.uri }} style={styles.thumb} />
+                        <Pressable
+                          onPress={() => removeImage(i)}
+                          style={styles.thumbRemove}
+                          hitSlop={8}
+                        >
+                          <Text style={styles.thumbRemoveText}>×</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
                       <Pressable
-                        onPress={() => removeImage(i)}
-                        style={styles.thumbRemove}
-                        hitSlop={8}
+                        key="add"
+                        onPress={() => addPhoto("camera")}
+                        accessibilityRole="button"
+                        accessibilityLabel="Take another photo"
+                        style={({ pressed }) => [
+                          styles.addSlot,
+                          pressed && styles.pressed,
+                        ]}
                       >
-                        <Text style={styles.thumbRemoveText}>×</Text>
+                        <Ionicons name="camera-outline" size={28} color="#6A6A76" />
                       </Pressable>
-                    </View>
-                  ) : (
-                    <Pressable
-                      key="add"
-                      onPress={() => addPhoto("camera")}
-                      accessibilityRole="button"
-                      accessibilityLabel="Take another photo"
-                      style={({ pressed }) => [
-                        styles.addSlot,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Ionicons name="camera-outline" size={28} color="#6A6A76" />
-                    </Pressable>
-                  ),
-              )}
+                    ),
+                )}
+              </View>
             </View>
 
             <View style={styles.hintWrap}>
@@ -1254,12 +1256,12 @@ const styles = StyleSheet.create({
   },
   thumbRow: { gap: 10, paddingVertical: 2, alignItems: "center" },
   thumbWrap: { position: "relative" },
-  thumbGrid: {
+  thumbGrid: { paddingTop: 6, height: 6 + 96 * 2 + 12 },
+  thumbGridRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingTop: 6,
-    height: 6 + 96,
+    height: 96,
   },
   // A little smaller than a photo, so it reads as a slot rather than one more.
   addSlot: {
