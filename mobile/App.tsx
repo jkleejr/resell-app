@@ -582,7 +582,7 @@ export default function App() {
           <View style={styles.counterRow}>
             {totalScans !== null ? (
               <Text style={styles.counter}>
-                🛍️ {totalScans.toLocaleString()} items scanned globally
+                {totalScans.toLocaleString()} items scanned globally
               </Text>
             ) : (
               <View />
