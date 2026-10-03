@@ -123,8 +123,8 @@ export default function App() {
   const thumbSize = Math.floor(
     (screenWidth - 48 - THUMB_GAP * (MAX_IMAGES - 1)) / MAX_IMAGES,
   );
-  // The empty slot stays a little smaller than a photo, as it always was.
-  const addSlotSize = Math.round((thumbSize * 80) / 96);
+  // The empty slot is a little smaller than a photo.
+  const addSlotSize = Math.round(thumbSize * 0.74);
   const [hint, setHint] = useState("");
   const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -654,7 +654,7 @@ export default function App() {
                           pressed && styles.pressed,
                         ]}
                       >
-                        <Ionicons name="camera-outline" size={28} color="#6A6A76" />
+                        <Ionicons name="camera-outline" size={26} color="#6A6A76" />
                       </Pressable>
                     ),
                 )}
