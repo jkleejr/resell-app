@@ -55,6 +55,7 @@ function rateAt(p: Platform, price: number): Platform {
 // Etsy (US): $0.20 listing + 6.5% transaction + 3% + $0.25 payment processing.
 // StockX: 12% base total (9% transaction at seller level 1 + 3% processing).
 // Reverb (US): 5% selling fee + 3.19% + $0.49 payment processing.
+// Poshmark: a flat $2.95 under $15, 20% from $15 up.
 // Depop (US): no selling fee; 3.3% + $0.45 payment processing.
 // The RealReal: a consignment commission of 10% to 80% of the selling price,
 // set per item by category and price.
@@ -62,7 +63,13 @@ const PLATFORMS: Platform[] = [
   { name: "Facebook Marketplace", feePct: 0.0, flatFee: 0, shipping: "local" },
   { name: "eBay", feePct: 0.13, flatFee: 0.35, shipping: "prepaid" },
   { name: "Etsy", feePct: 0.095, flatFee: 0.45, shipping: "prepaid" },
-  { name: "Poshmark", feePct: 0.2, flatFee: 0, shipping: "prepaid" },
+  {
+    name: "Poshmark",
+    feePct: 0.2,
+    flatFee: 0,
+    shipping: "prepaid",
+    below: { price: 15, feePct: 0, flatFee: 2.95 },
+  },
   { name: "Mercari", feePct: 0.1, flatFee: 0, shipping: "prepaid" },
   { name: "OfferUp", feePct: 0.0, flatFee: 0, shipping: "local" },
   { name: "Depop", feePct: 0.033, flatFee: 0.45, shipping: "prepaid" },
@@ -151,12 +158,15 @@ function netPayout(anchor: number, p: Platform, feePct = p.feePct): number {
 // Two decimals at most, and only as many as the fee has: 13%, 9.5%, 8.19%.
 const percent = (fraction: number) => `${Number((fraction * 100).toFixed(2))}%`;
 
-// "9.5% + $0.45", "8.19% + $0.49", "6% (min $1.99)", "10–80%", "No seller fee".
+// "9.5% + $0.45", "8.19% + $0.49", "6% (min $1.99)", "$2.95", "10–80%",
+// "No seller fee".
 function feeNote(p: Platform): string {
   if (p.maxFeePct !== undefined) {
     return `${Number((p.feePct * 100).toFixed(2))}–${percent(p.maxFeePct)}`;
   }
   if (p.feePct === 0 && p.flatFee === 0) return "No seller fee";
+  // A flat fee alone (Poshmark under $15) is just the amount, not "0% + $2.95".
+  if (p.feePct === 0) return `$${p.flatFee.toFixed(2)}`;
   const pct = percent(p.feePct);
   const flat = p.flatFee ? ` + $${p.flatFee.toFixed(2)}` : "";
   const min = p.minFee ? ` (min $${p.minFee})` : "";

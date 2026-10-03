@@ -127,7 +127,9 @@ export interface ScanEvent {
   verify?: VerifyStatus;
   /** Time spent on the price check, when one was attempted. */
   verifyMs?: number;
-  /** The range the search put in place of the estimate. */
+  /** The range the search put in place of the estimate: on "verified", and
+   *  on "few_listings" since that also moves the price. Older records hold it
+   *  for "verified" only. */
   verifiedLow?: number;
   verifiedHigh?: number;
 }

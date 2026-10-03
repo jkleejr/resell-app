@@ -92,7 +92,12 @@ const MAX_IMAGES = 3;
 // A long screenshot at that width can run past 8000px tall — over the API's
 // limit, so every scan of it fails — so its height is capped here instead.
 const MAX_PHOTO_HEIGHT = 2048;
-// Matches the backend's MAX_HINT_CHARS, which trims anything longer.
+// The detail field takes about as much as its box shows, so nothing typed
+// scrolls out of sight. A character count can only approximate a width — "W"
+// is wider than "i" — so this is the average width of a 15pt character in
+// ordinary text, measured off the placeholder: about 45 fit on a 430pt-wide
+// phone. Never more than the backend's MAX_HINT_CHARS, which trims the rest.
+const HINT_CHAR_WIDTH = 7.4;
 const MAX_HINT_CHARS = 200;
 // Space between the photos on the compose screen.
 const THUMB_GAP = 14;
@@ -145,6 +150,12 @@ export default function App() {
   const thumbSize = Math.floor(
     (screenWidth - 48 - THUMB_GAP * (MAX_IMAGES - 1)) / MAX_IMAGES,
   );
+  // The box's text area: the page's 24pt padding and the field's own 14pt
+  // padding and 1pt border, each side.
+  const hintMaxChars = Math.min(
+    MAX_HINT_CHARS,
+    Math.floor((screenWidth - 48 - 30) / HINT_CHAR_WIDTH),
+  );
   // The empty slot is a little smaller than a photo.
   const addSlotSize = Math.round(thumbSize * 0.74);
   const [hint, setHint] = useState("");
@@ -153,6 +164,7 @@ export default function App() {
   const [copiedField, setCopiedField] = useState<"title" | "listing" | null>(
     null,
   );
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [totalScans, setTotalScans] = useState<number | null>(null);
   // Set when the backend returns 429. Blocks further scanning until the cap
   // resets at UTC midnight. Deliberately NOT persisted: on a fresh launch the
@@ -228,7 +240,10 @@ export default function App() {
   async function copyText(text: string, field: "title" | "listing") {
     await Clipboard.setStringAsync(text);
     setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
+    // One timer at a time: copying the description right after the title
+    // must not let the title's timer clear the description's "Copied".
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopiedField(null), 2000);
   }
 
   async function addPhoto(source: "camera" | "library") {
@@ -709,7 +724,7 @@ export default function App() {
                 placeholderTextColor="#6A6A76"
                 value={hint}
                 onChangeText={setHint}
-                maxLength={MAX_HINT_CHARS}
+                maxLength={hintMaxChars}
                 returnKeyType="done"
               />
               <Text style={styles.hintTip}>

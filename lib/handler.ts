@@ -154,7 +154,9 @@ export async function handleAnalyzeRequest(
     const visionMs = Date.now() - visionStartedAt;
     const checked = await maybeVerifyPrice(result, ctx.deviceId, startedAt);
     const priced = checked.result;
-    const verified = priced.priceBasis === "verified";
+    // Both outcomes replace the estimate with a searched range; the log keeps
+    // that range for each, and `verify` says which it was.
+    const moved = checked.status === "verified" || checked.status === "few_listings";
     await logScan({
       outcome: "ok",
       visionMs,
@@ -166,8 +168,8 @@ export async function handleAnalyzeRequest(
       ...itemFacts(result),
       verify: checked.status,
       verifyMs: checked.ms,
-      verifiedLow: verified ? priced.estimatedValueUSD.low : undefined,
-      verifiedHigh: verified ? priced.estimatedValueUSD.high : undefined,
+      verifiedLow: moved ? priced.estimatedValueUSD.low : undefined,
+      verifiedHigh: moved ? priced.estimatedValueUSD.high : undefined,
     });
     return { status: 200, body: priced as unknown as Record<string, unknown> };
   } catch (err) {

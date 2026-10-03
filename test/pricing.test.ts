@@ -24,3 +24,10 @@ test("a single fee rate shows one payout", () => {
   assert.equal(row("StockX", 30).net, 26);
   assert.equal(row("StockX", 30).feeNote, "12%");
 });
+
+test("Poshmark takes a flat $2.95 under $15 and 20% from $15 up", () => {
+  assert.equal(row("Poshmark", 10).net, 7);
+  assert.equal(row("Poshmark", 10).feeNote, "$2.95");
+  assert.equal(row("Poshmark", 15).net, 12);
+  assert.equal(row("Poshmark", 15).feeNote, "20%");
+});
