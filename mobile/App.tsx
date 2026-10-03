@@ -823,14 +823,7 @@ export default function App() {
                     style={[styles.row, row.recommended && styles.rowBest]}
                   >
                     <View style={styles.rowLeft}>
-                      <View style={styles.rowNameWrap}>
-                        <Text style={styles.rowName}>{row.name}</Text>
-                        {row.recommended && (
-                          <View style={styles.bestTag}>
-                            <Text style={styles.bestTagText}>BEST</Text>
-                          </View>
-                        )}
-                      </View>
+                      <Text style={styles.rowName}>{row.name}</Text>
                       <Text style={styles.rowMeta}>
                         {/* A fee in red, as money off the top. "No seller fee"
                             is good news, so it stays grey. */}
@@ -1403,15 +1396,7 @@ const styles = StyleSheet.create({
   },
   rowBest: { borderWidth: 1.5, borderColor: "#4ADE80", backgroundColor: "#16241B" },
   rowLeft: { flex: 1, gap: 3 },
-  rowNameWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
   rowName: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  bestTag: {
-    backgroundColor: "#4ADE80",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  bestTagText: { color: "#0E0E10", fontSize: 10, fontWeight: "800" },
   rowMeta: { color: "#7A7A86", fontSize: 12 },
   rowFee: { color: "#EF4444" },
   rowNet: { color: "#fff", fontSize: 18, fontWeight: "700", marginLeft: 10 },
