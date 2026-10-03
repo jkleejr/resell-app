@@ -608,7 +608,8 @@ export default function App() {
                 the 327pt content width of the smallest current iPhone. The
                 empty slot for the next photo sits right after the last one.
                 The grid keeps the height of the old two-row layout, so the
-                detail field below stays where it always was. */}
+                detail field below stays where it always was, and the row is
+                centred in it. */}
             <View style={styles.thumbGrid}>
               <View style={styles.thumbGridRow}>
                 {(images.length < MAX_IMAGES ? [...images, null] : images).map(
@@ -1267,7 +1268,9 @@ const styles = StyleSheet.create({
   },
   thumbRow: { gap: 10, paddingVertical: 2, alignItems: "center" },
   thumbWrap: { position: "relative" },
-  thumbGrid: { paddingTop: 6, height: 6 + 96 * 2 + 12 },
+  // The height of the old two-row grid, with the one row centred in it, so it
+  // sits midway between the scan counter and the detail field.
+  thumbGrid: { height: 6 + 96 * 2 + 12, justifyContent: "center" },
   thumbGridRow: {
     flexDirection: "row",
     alignItems: "center",
