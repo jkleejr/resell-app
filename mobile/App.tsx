@@ -551,10 +551,18 @@ export default function App() {
     );
   }
 
+  const home = status === "idle" && images.length === 0;
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
+      {/* On the home screen the page itself holds still: only the history
+          list scrolls, and the photo buttons stay pinned at the bottom. */}
+      <ScrollView
+        ref={scrollRef}
+        scrollEnabled={!home}
+        contentContainerStyle={[styles.container, home && styles.homeContainer]}
+      >
         {/* The result page opens straight on the photo, with no name above. */}
         {status !== "done" && (
           <View style={styles.headerRow}>
@@ -896,6 +904,46 @@ export default function App() {
           </>
         )}
 
+        {/* History, on the home screen above the photo buttons. Hidden until
+            it has loaded so the empty-state line never flashes up. The list
+            scrolls on its own so the buttons below always stay put. */}
+        {home && history !== null && (
+          <View style={styles.history}>
+            <View style={styles.historyHeader}>
+              <Text style={styles.historyTitle}>History</Text>
+              {history.length > 0 && (
+                <Pressable onPress={confirmClear} hitSlop={8}>
+                  <Text style={styles.historyClear}>Clear</Text>
+                </Pressable>
+              )}
+            </View>
+            {history.length === 0 ? (
+              <Text style={styles.muted}>
+                Nothing yet. Every item you scan will show up here.
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.hintTip}>
+                  Saved on this phone only. Swipe left on a scan to delete it.
+                </Text>
+                <ScrollView
+                  style={styles.historyList}
+                  contentContainerStyle={styles.historyListContent}
+                >
+                  {history.map((scan) => (
+                    <HistoryRow
+                      key={scan.id}
+                      scan={scan}
+                      onPress={() => openSaved(scan)}
+                      onDelete={() => removeSaved(scan)}
+                    />
+                  ))}
+                </ScrollView>
+              </>
+            )}
+          </View>
+        )}
+
         <View style={styles.actions}>
           {status === "idle" &&
             (images.length === 0 ? (
@@ -951,39 +999,6 @@ export default function App() {
             ))}
         </View>
 
-        {/* History, on the home screen under the photo buttons. Hidden until
-            it has loaded so the empty-state line never flashes up. */}
-        {status === "idle" && images.length === 0 && history !== null && (
-          <View style={styles.history}>
-            <View style={styles.historyHeader}>
-              <Text style={styles.historyTitle}>History</Text>
-              {history.length > 0 && (
-                <Pressable onPress={confirmClear} hitSlop={8}>
-                  <Text style={styles.historyClear}>Clear</Text>
-                </Pressable>
-              )}
-            </View>
-            {history.length === 0 ? (
-              <Text style={styles.muted}>
-                Nothing yet. Every item you scan will show up here.
-              </Text>
-            ) : (
-              <>
-                {history.map((scan) => (
-                  <HistoryRow
-                    key={scan.id}
-                    scan={scan}
-                    onPress={() => openSaved(scan)}
-                    onDelete={() => removeSaved(scan)}
-                  />
-                ))}
-                <Text style={styles.hintTip}>
-                  Saved on this phone only. Swipe left on a scan to delete it.
-                </Text>
-              </>
-            )}
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1377,7 +1392,10 @@ const styles = StyleSheet.create({
   rowMeta: { color: "#7A7A86", fontSize: 12 },
   rowFee: { color: "#EF4444" },
   rowNet: { color: "#fff", fontSize: 18, fontWeight: "700", marginLeft: 10 },
-  history: { gap: 12, marginTop: 16 },
+  homeContainer: { flex: 1 },
+  history: { flex: 1, gap: 12, marginTop: 16 },
+  historyList: { flexGrow: 0, flexShrink: 1 },
+  historyListContent: { gap: 12 },
   historyHeader: {
     flexDirection: "row",
     alignItems: "baseline",
