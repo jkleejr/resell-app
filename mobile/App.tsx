@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -361,11 +361,8 @@ export default function App() {
     setResult(null);
     setError(null);
     setCopiedField(null);
-    // Every way out of a page lands at the top of the next one. Leaving a
-    // result from "Scan another" at the bottom would otherwise keep that
-    // offset on a home screen too short to show anything there, and home
-    // can't be scrolled back up, so it sat blank. Opening a saved scan from
-    // the history list, below the fold, would open the result partway down.
+    // Every way out of a page lands at the top of the next one, rather than
+    // wherever the last page was scrolled to.
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }
 
@@ -558,13 +555,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
-      {/* On the home screen the page itself holds still: only the history
-          list scrolls, and the photo buttons stay pinned at the bottom. */}
-      <ScrollView
-        ref={scrollRef}
-        scrollEnabled={!home}
-        contentContainerStyle={[styles.container, home && styles.homeContainer]}
-      >
+      <Page home={home} scrollRef={scrollRef}>
         {/* The result page opens straight on the photo, with no name above. */}
         {status !== "done" && (
           <View style={styles.headerRow}>
@@ -1003,8 +994,36 @@ export default function App() {
             ))}
         </View>
 
-      </ScrollView>
+      </Page>
     </SafeAreaView>
+  );
+}
+
+// The home screen is not a scrolling page: it is exactly one screen tall, the
+// history list scrolls on its own, and the photo buttons sit pinned at the
+// bottom. It used to be the same ScrollView as every other page with scrolling
+// switched off, but a scroll view's content isn't held to the screen's height,
+// so coming back from a long result could leave home taller than the screen,
+// the buttons pushed off the bottom and no way to scroll down to them. A plain
+// View can't outgrow the screen.
+function Page({
+  home,
+  scrollRef,
+  children,
+}: {
+  home: boolean;
+  scrollRef: RefObject<ScrollView | null>;
+  children: ReactNode;
+}) {
+  if (home) {
+    return (
+      <View style={[styles.container, styles.homeContainer]}>{children}</View>
+    );
+  }
+  return (
+    <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
+      {children}
+    </ScrollView>
   );
 }
 
