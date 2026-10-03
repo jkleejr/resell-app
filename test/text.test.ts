@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cleanLanguage, dropHedges, dropTitleHedges } from "../lib/text.js";
+import {
+  cleanLanguage,
+  completeSentences,
+  dropHedges,
+  dropTitleHedges,
+} from "../lib/text.js";
 
 test("drops a sentence explaining how the item was identified", () => {
   assert.equal(
@@ -81,4 +86,38 @@ test("blanks the badge when nothing was translated or the value isn't a language
   assert.equal(cleanLanguage("N/A"), "");
   assert.equal(cleanLanguage("The label is in Japanese"), "");
   assert.equal(cleanLanguage(42), "");
+});
+
+test("keeps a sentence about what the item is made for", () => {
+  const text =
+    "Nike Air Max 90 sneakers in white. Comfortable cushioning made for everyday wear.";
+  assert.equal(dropHedges(text), text);
+});
+
+test("keeps a product name that contains a hedge word", () => {
+  const text = "Joy Division Unknown Pleasures vinyl LP.";
+  assert.equal(dropHedges(text), text);
+});
+
+test("still drops a sentence that opens on a hedge word", () => {
+  assert.equal(
+    dropHedges("Vintage brass desk lamp. Unknown maker."),
+    "Vintage brass desk lamp.",
+  );
+});
+
+test("cuts an unfinished tail at a sentence end, not a decimal point", () => {
+  assert.equal(
+    completeSentences("Bose SoundLink speaker. It has a 3.5mm aux input and"),
+    "Bose SoundLink speaker.",
+  );
+  assert.equal(
+    completeSentences("Apple iPhone 13 with a 6.1-inch display and"),
+    "",
+  );
+});
+
+test("keeps text that already ends a sentence", () => {
+  const text = "Apple iPhone 13 with a 6.1-inch display.";
+  assert.equal(completeSentences(text), text);
 });

@@ -46,6 +46,12 @@ export interface RequestContext {
 // still letting the user add an overall shot plus a logo/label close-up.
 const MAX_IMAGES = 4;
 
+// A hint is a brand, a size, a model number. Anything past this is not a hint,
+// it is tokens we pay for — the field is otherwise the one part of a request
+// with no bound but the platform's 4.5MB body limit. Trimmed rather than
+// refused, so a long hint from a build without the app's own limit still scans.
+const MAX_HINT_CHARS = 200;
+
 export async function handleAnalyzeRequest(
   body: unknown,
   ctx: RequestContext = {},
@@ -89,7 +95,10 @@ export async function handleAnalyzeRequest(
     images.push({ data: item.image, mediaType });
   }
 
-  const hint = typeof input.hint === "string" ? input.hint : undefined;
+  const hint =
+    typeof input.hint === "string"
+      ? input.hint.trim().slice(0, MAX_HINT_CHARS)
+      : undefined;
   const markets = readMarketplaces(input);
   // Only a known label is kept; anything else is dropped rather than logged,
   // so this field can never carry free text into the scan log.

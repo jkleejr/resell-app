@@ -58,12 +58,14 @@ export function completeSentences(text: string): string {
   if (!text) return "";
   // Already ends on a terminator, possibly inside a closing quote or bracket.
   if (/[.!?]["'’)\]]?$/.test(text)) return text;
-  const cut = Math.max(
-    text.lastIndexOf("."),
-    text.lastIndexOf("!"),
-    text.lastIndexOf("?"),
-  );
-  return cut === -1 ? "" : text.slice(0, cut + 1).trim();
+  // Cut after the last terminator that actually ends a sentence — one followed
+  // by a space. A bare lastIndexOf(".") lands inside "3.5mm" or "6.1-inch" and
+  // leaves the copy ending on "with a 3."
+  let cut = -1;
+  for (const m of text.matchAll(/[.!?]["'’)\]]?(?=\s)/g)) {
+    cut = m.index + m[0].length;
+  }
+  return cut === -1 ? "" : text.slice(0, cut).trim();
 }
 
 /**
@@ -86,7 +88,9 @@ const HEDGE_PATTERNS: RegExp[] = [
   /\bplease (?:verify|confirm|inquire|ask|contact|message|check)\b/i,
   /\b(?:inquire|message me|contact me|ask before (?:buying|purchasing)|ask for details)\b/i,
   /\b(?:exact|specific) (?:year|model|make|specs?|specifications?|size)\b[^.!?]*\bnot\b/i,
-  /\b(?:unknown|unclear|undetermined|unverified)\b/i,
+  // Case-sensitive on purpose: capitalised mid-sentence, these are part of a
+  // name ("Joy Division Unknown Pleasures vinyl LP."), not a hedge.
+  /\b(?:unknown|unclear|undetermined|unverified)\b|^(?:Unknown|Unclear|Undetermined|Unverified)\b/,
   // The model explaining how it identified the item, or grading its own
   // evidence: "The slim form factor is identifiable by its rounded top." Its
   // reasoning, not a fact about the item, and the prompt's ban alone kept
@@ -99,8 +103,9 @@ const HEDGE_PATTERNS: RegExp[] = [
   /\bno (?:visible |obvious |noticeable )?(?:signs? of )?(?:wear|damage|scratches|scuffs|cracks|chips|dents|stains|flaws)\b/i,
   // General wear, which the prompt also keeps out: "shows general use wear",
   // "light signs of wear". A specific flaw ("One knob cap is missing.") is its
-  // own sentence and does not match.
-  /\b(?:general|normal|light|minor|typical|everyday|some|surface) (?:use |signs of )?wear\b/i,
+  // own sentence and does not match. Nor does what the item is FOR: "made for
+  // everyday wear" describes the item, not its condition.
+  /(?<!\bfor )\b(?:general|normal|light|minor|typical|everyday|some|surface) (?:use |signs of )?wear\b/i,
 ];
 
 /**
