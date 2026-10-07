@@ -6,6 +6,7 @@ import {
   Image,
   Linking,
   PanResponder,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -99,8 +100,18 @@ const MAX_PHOTO_HEIGHT = 2048;
 // phone. Never more than the backend's MAX_HINT_CHARS, which trims the rest.
 const HINT_CHAR_WIDTH = 7.4;
 const MAX_HINT_CHARS = 200;
+// iPad is held further away than a phone and has room to spare, so on iPad
+// everything — text, cards, buttons, spacing — is drawn this much bigger. Sizes
+// in the stylesheet are scaled by scaleStyles below; sizes worked out in code
+// go through ui(). On iPhone it is exactly 1, so nothing there changes.
+const IPAD_SCALE = Platform.OS === "ios" && Platform.isPad ? 1.2 : 1;
+const ui = (n: number) => n * IPAD_SCALE;
 // Space between the photos on the compose screen.
 const THUMB_GAP = 14;
+// The widest the page gets, padding included. Phones are narrower, so this
+// only bites on iPad, where the page is a centred column at about the width
+// of a large phone in landscape rather than stretched edge to edge.
+const MAX_PAGE_WIDTH = 600;
 
 const CONDITION_LABELS: Record<string, string> = {
   new: "New",
@@ -145,16 +156,25 @@ export default function App() {
   const [elapsed, setElapsed] = useState(0);
   const [images, setImages] = useState<CapturedImage[]>([]);
   // Compose photos are sized so MAX_IMAGES of them span the content width
-  // exactly (the page has 24pt padding each side), whatever the phone.
+  // exactly (the page has 24pt padding each side), whatever the device. The
+  // window can report a width of 0 before its first layout, so neither size
+  // is allowed below zero.
   const { width: screenWidth } = useWindowDimensions();
-  const thumbSize = Math.floor(
-    (screenWidth - 48 - THUMB_GAP * (MAX_IMAGES - 1)) / MAX_IMAGES,
+  const pageWidth = Math.min(screenWidth, ui(MAX_PAGE_WIDTH));
+  const thumbSize = Math.max(
+    0,
+    Math.floor(
+      (pageWidth - ui(48) - ui(THUMB_GAP) * (MAX_IMAGES - 1)) / MAX_IMAGES,
+    ),
   );
   // The box's text area: the page's 24pt padding and the field's own 14pt
   // padding and 1pt border, each side.
-  const hintMaxChars = Math.min(
-    MAX_HINT_CHARS,
-    Math.floor((screenWidth - 48 - 30) / HINT_CHAR_WIDTH),
+  const hintMaxChars = Math.max(
+    1,
+    Math.min(
+      MAX_HINT_CHARS,
+      Math.floor((pageWidth - ui(48 + 30)) / ui(HINT_CHAR_WIDTH)),
+    ),
   );
   // The empty slot is a little smaller than a photo.
   const addSlotSize = Math.round(thumbSize * 0.74);
@@ -709,7 +729,11 @@ export default function App() {
                           pressed && styles.pressed,
                         ]}
                       >
-                        <Ionicons name="camera-outline" size={26} color="#6A6A76" />
+                        <Ionicons
+                          name="camera-outline"
+                          size={ui(26)}
+                          color="#6A6A76"
+                        />
                       </Pressable>
                     ),
                 )}
@@ -1141,6 +1165,8 @@ function Badge({
 
 // How far a history row slides open to show its Delete button.
 const DELETE_WIDTH = 88;
+// The same, as drawn: the stylesheet scales its copy for iPad on its own.
+const DELETE_OPEN = ui(DELETE_WIDTH);
 
 // One past scan in the history list: its photo, title, when, and the price.
 // Swiping left slides the row over a Delete button, like Mail on iOS; a long
@@ -1162,7 +1188,7 @@ function HistoryRow({
   function settle(toOpen: boolean) {
     open.current = toOpen;
     Animated.spring(x, {
-      toValue: toOpen ? -DELETE_WIDTH : 0,
+      toValue: toOpen ? -DELETE_OPEN : 0,
       useNativeDriver: true,
       bounciness: 0,
     }).start();
@@ -1175,11 +1201,11 @@ function HistoryRow({
         Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
       onPanResponderTerminationRequest: () => false,
       onPanResponderMove: (_, g) => {
-        const from = open.current ? -DELETE_WIDTH : 0;
+        const from = open.current ? -DELETE_OPEN : 0;
         x.setValue(Math.min(0, Math.max(-width.current, from + g.dx)));
       },
       onPanResponderRelease: (_, g) => {
-        const at = (open.current ? -DELETE_WIDTH : 0) + g.dx;
+        const at = (open.current ? -DELETE_OPEN : 0) + g.dx;
         // Distance only, never speed: a quick flick should open the row, not
         // delete something.
         if (at < -width.current / 2) {
@@ -1191,7 +1217,7 @@ function HistoryRow({
           return;
         }
         // A quick flick decides on its own; otherwise go to the nearer side.
-        settle(g.vx < -0.5 || (g.vx <= 0.5 && at < -DELETE_WIDTH / 2));
+        settle(g.vx < -0.5 || (g.vx <= 0.5 && at < -DELETE_OPEN / 2));
       },
       onPanResponderTerminate: () => settle(open.current),
     }),
@@ -1300,9 +1326,46 @@ function SecondaryButton({
   );
 }
 
-const styles = StyleSheet.create({
+// Every size-like number in a stylesheet, times IPAD_SCALE. Border widths stay
+// as they are: a hairline is a hairline at any size.
+const SCALED_KEYS = new Set([
+  "fontSize", "lineHeight", "letterSpacing",
+  "padding", "paddingTop", "paddingBottom", "paddingLeft", "paddingRight",
+  "paddingHorizontal", "paddingVertical",
+  "margin", "marginTop", "marginBottom", "marginLeft", "marginRight",
+  "marginHorizontal", "marginVertical",
+  "gap", "rowGap", "columnGap",
+  "width", "height", "minWidth", "minHeight", "maxWidth", "maxHeight",
+  "borderRadius", "top", "right", "bottom", "left",
+]);
+
+function scaleStyles<T extends Record<string, object>>(sheet: T): T {
+  if (IPAD_SCALE === 1) return sheet;
+  const out: Record<string, object> = {};
+  for (const [name, style] of Object.entries(sheet)) {
+    out[name] = Object.fromEntries(
+      Object.entries(style).map(([key, value]) => [
+        key,
+        typeof value === "number" && SCALED_KEYS.has(key)
+          ? value * IPAD_SCALE
+          : value,
+      ]),
+    );
+  }
+  return out as T;
+}
+
+const styles = StyleSheet.create(scaleStyles({
   safe: { flex: 1, backgroundColor: "#0E0E10" },
-  container: { padding: 24, paddingTop: 32, gap: 16, flexGrow: 1 },
+  container: {
+    padding: 24,
+    paddingTop: 32,
+    gap: 16,
+    flexGrow: 1,
+    width: "100%",
+    maxWidth: MAX_PAGE_WIDTH,
+    alignSelf: "center",
+  },
   brand: { color: "#fff", fontSize: 40, fontWeight: "800", letterSpacing: -1 },
   headerRow: {
     flexDirection: "row",
@@ -1557,4 +1620,4 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: "#fff", fontSize: 17, fontWeight: "600" },
   pressed: { opacity: 0.7 },
   disabled: { opacity: 0.4 },
-});
+}));

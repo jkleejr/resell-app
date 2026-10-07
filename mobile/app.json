@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.resellit.app",
-      "supportsTablet": false,
+      "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
