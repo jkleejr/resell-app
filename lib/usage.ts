@@ -44,11 +44,18 @@ export function configured(): boolean {
   return Boolean(REST_URL && REST_TOKEN);
 }
 
-// Run an Upstash REST pipeline; returns the results array, or null on any error.
-// `timeoutMs` is for callers that would rather give up than wait (the scan log).
+// A healthy round trip is tens of milliseconds. Every call gives up after this,
+// so an Upstash that hangs instead of erroring is treated like one that's down
+// (scans fail open, searches fail closed) rather than holding the request
+// until the platform kills it.
+const DEFAULT_TIMEOUT_MS = 2_000;
+
+// Run an Upstash REST pipeline; returns the results array, or null on any error
+// or timeout. Callers that would rather give up sooner pass `timeoutMs` (the
+// scan log).
 export async function pipeline(
   commands: (string | number)[][],
-  timeoutMs?: number,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): Promise<unknown[] | null> {
   try {
     const res = await fetch(`${REST_URL}/pipeline`, {
@@ -58,7 +65,7 @@ export async function pipeline(
         "content-type": "application/json",
       },
       body: JSON.stringify(commands),
-      signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) throw new Error(`Upstash responded ${res.status}`);
     return (await res.json()) as unknown[];
@@ -82,19 +89,14 @@ export async function checkAndRecordScan(
   const day = utcDay();
   const id = (deviceId ?? "").trim() || "unknown";
 
-  // Gating increments: per-device-day, and (optionally) global-day.
-  const cmds: (string | number)[][] = [
+  // The device's own count first. The global count is only bumped once the
+  // device is under its cap: bumping both together let one device past its cap
+  // keep spending the whole app's daily allowance with requests that were
+  // refused anyway.
+  const out = await pipeline([
     ["INCR", `usage:${id}:${day}`],
     ["EXPIRE", `usage:${id}:${day}`, KEY_TTL_SECONDS],
-  ];
-  if (GLOBAL_DAILY_CAP !== null) {
-    cmds.push(
-      ["INCR", `scans:day:${day}`],
-      ["EXPIRE", `scans:day:${day}`, KEY_TTL_SECONDS],
-    );
-  }
-
-  const out = await pipeline(cmds);
+  ]);
   if (!out) return { allowed: true }; // fail open on KV error
 
   const deviceUsed = resultInt(out[0]);
@@ -107,7 +109,12 @@ export async function checkAndRecordScan(
     };
   }
   if (GLOBAL_DAILY_CAP !== null) {
-    const globalUsed = resultInt(out[2]);
+    const global = await pipeline([
+      ["INCR", `scans:day:${day}`],
+      ["EXPIRE", `scans:day:${day}`, KEY_TTL_SECONDS],
+    ]);
+    if (!global) return { allowed: true, scanOfDay: deviceUsed }; // fail open
+    const globalUsed = resultInt(global[0]);
     if (globalUsed > GLOBAL_DAILY_CAP) {
       return {
         allowed: false,

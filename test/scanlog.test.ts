@@ -20,6 +20,8 @@ before(async () => {
   process.env.ANTHROPIC_BASE_URL = fake.url;
   process.env.ANTHROPIC_API_KEY = "fake-key";
   process.env.ANALYZE_TIMEOUT_MS = "400";
+  // On, so the global count is exercised; far above anything a test reaches.
+  process.env.GLOBAL_DAILY_CAP = "1000";
   ({ handleAnalyzeRequest } = await import("../lib/handler.js"));
   ({ readScanEvents, startOfUTCDay } = await import("../lib/scanlog.js"));
 });
@@ -260,6 +262,35 @@ test("a scan blocked by the daily cap is recorded as capped", async () => {
   assert.equal(e!.outcome, "capped");
   assert.equal(e!.scanOfDay, 101);
   assert.equal(fake.visionCalls, 0);
+});
+
+test("a scan refused by the device cap does not count against the global cap", async () => {
+  const day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  fake.store.set(`usage:${DEVICE}:${day}`, 100);
+
+  const res = await scan();
+  assert.equal(res.status, 429);
+  assert.equal(fake.store.get(`scans:day:${day}`), undefined);
+
+  // An allowed scan still counts.
+  fake.store.set(`usage:${DEVICE}:${day}`, 0);
+  assert.equal((await scan()).status, 200);
+  assert.equal(fake.store.get(`scans:day:${day}`), 1);
+});
+
+test("a web search whose prices were set aside says nothing about listings", async () => {
+  process.env.PRICE_VERIFY = "on";
+  fake.visionItem = ORIGINAL_ITEM;
+  // Far outside the estimate: listings were found, just not for this item.
+  fake.verifyReply = { ...fake.verifyReply, rangeUSD: { low: 9000, high: 12000 } };
+
+  const res = await scan();
+  assert.equal(res.body.priceNote, "");
+  assert.equal(res.body.priceBasis, "estimate");
+  assert.deepEqual(res.body.estimatedValueUSD, ORIGINAL_ITEM.estimatedValueUSD);
+
+  const [e] = await readScanEvents();
+  assert.equal(e!.verify, "discarded");
 });
 
 test("a rejected request (no image) is not a scan and is not recorded", async () => {

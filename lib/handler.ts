@@ -330,9 +330,24 @@ async function maybeVerifyPrice(
     return { result, status: "no_allowance" };
   }
 
+  // Measured again: the claim is a Redis round trip, and a slow one comes out
+  // of the search's time, not the margin left for sending the response.
+  const leftMs =
+    FUNCTION_BUDGET_MS - (Date.now() - startedAt) - RESPONSE_MARGIN_MS;
+  if (leftMs < MIN_VERIFY_MS) {
+    console.log(`[verify] skipped: only ${leftMs}ms left after the claim`);
+    return { result, status: "no_time" };
+  }
+
   const verifyStartedAt = Date.now();
-  const outcome = await verifyPrice(result, remainingMs);
+  const outcome = await verifyPrice(result, leftMs);
   const spent = { ms: Date.now() - verifyStartedAt, costUSD: outcome.costUSD };
+  if (!outcome.price && outcome.discarded) {
+    // Listings were found, just not ones we trust for this item, so neither
+    // "Couldn't find listings" nor a tick is true. The estimate stands, and
+    // says nothing about the search.
+    return { result, status: "discarded", ...spent };
+  }
   if (!outcome.price) {
     // Two different situations, and only one of them is ours to explain.
     //

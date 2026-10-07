@@ -40,6 +40,11 @@ export function cleanText(value: unknown): string {
     .trim();
 }
 
+// How a description that stops mid-clause ends: on punctuation that promises
+// more, or on a word that can't end an English sentence.
+const DANGLING_END =
+  /(?:[,;:(&+\-–—/]|\b(?:and|or|but|nor|with|without|plus|including|featuring|the|a|an|of|in|on|at|to|for|from|by|as|into|onto|its|their|his|her|our|your|this|that|these|those|is|are|was|were|has|have|had|very|which|who|where|while|than))$/i;
+
 /**
  * Drop a trailing half-sentence.
  *
@@ -58,6 +63,12 @@ export function completeSentences(text: string): string {
   if (!text) return "";
   // Already ends on a terminator, possibly inside a closing quote or bracket.
   if (/[.!?]["'’)\]]?$/.test(text)) return text;
+  // A last sentence that is whole but for its full stop ("Apple iPhone 13 in
+  // midnight blue") gets one. Cutting it threw away good copy — all of it, when
+  // the description was a single sentence. Only a tail that stops mid-clause,
+  // on a comma or a word that needs more after it, is cut below.
+  const trimmed = text.trim();
+  if (!DANGLING_END.test(trimmed)) return `${trimmed}.`;
   // Cut after the last terminator that actually ends a sentence — one followed
   // by a space. A bare lastIndexOf(".") lands inside "3.5mm" or "6.1-inch" and
   // leaves the copy ending on "with a 3."

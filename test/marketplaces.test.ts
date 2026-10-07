@@ -148,3 +148,11 @@ test("a model that lists nothing still shows the recommendation", async () => {
   const list = await relevantFor("eBay", [], { marketplaces: ["eBay", "Etsy"] });
   assert.deepEqual(list, ["eBay"]);
 });
+
+test("an other site the model spells two ways is listed once, as first spelled", async () => {
+  const list = await relevantFor("Grailed", ["grailed", "eBay", "GRAILED"], {
+    marketplaces: ["eBay"],
+    otherMarketplaces: true,
+  });
+  assert.deepEqual(list, ["Grailed", "eBay"]);
+});

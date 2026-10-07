@@ -453,10 +453,18 @@ function pickPlatform(
   const ranked = (Array.isArray(relevant) ? relevant : [])
     .map((n) => allowedPlatform(cleanText(n), markets))
     .filter((n): n is string => n !== null);
-  const relevantPlatforms = [...new Set([recommendedPlatform, ...ranked])].slice(
-    0,
-    MAX_RELEVANT,
-  );
+  // Once each, ignoring case: an "other" site keeps the model's own spelling,
+  // and it can spell one site two ways ("Grailed", "grailed"). The first
+  // spelling wins, so the recommendation's is the one shown.
+  const seen = new Set<string>();
+  const relevantPlatforms = [recommendedPlatform, ...ranked]
+    .filter((n) => {
+      const key = n.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, MAX_RELEVANT);
   return {
     recommendedPlatform,
     recommendationReason: picked ? reason : "",

@@ -256,9 +256,11 @@ export async function verifyPrice(
         // A search ran and we can read its verdict. Whether that verdict is
         // usable is interpret()'s call, but either way we can honestly say we
         // looked.
+        const verdict = interpret(JSON.parse(block.text), result);
         return {
-          price: interpret(JSON.parse(block.text), result),
+          price: verdict === DISCARDED ? null : verdict,
           searched: true,
+          discarded: verdict === DISCARDED,
           costUSD,
         };
       } catch {
@@ -280,11 +282,17 @@ export async function verifyPrice(
 // estimate with no note at all.
 const NOT_SEARCHED: VerifyOutcome = { price: null, searched: false };
 
-// Turn a raw verification response into a price we're willing to show — or null.
+// Prices came back, but not ones we're willing to show. Kept apart from null
+// (nothing usable found) because the seller is told different things.
+const DISCARDED = "discarded";
+
+// Turn a raw verification response into a price we're willing to show — or
+// null when the search found nothing usable, or DISCARDED when it found prices
+// we set aside.
 function interpret(
   raw: unknown,
   result: AnalyzeResult,
-): VerifiedPrice | null {
+): VerifiedPrice | typeof DISCARDED | null {
   const r = (raw ?? {}) as Record<string, unknown>;
 
   const evidence = VERIFY_EVIDENCE.includes(
@@ -304,7 +312,7 @@ function interpret(
   const range = (r.rangeUSD ?? {}) as Record<string, unknown>;
   const low = Math.round(toFinite(range.low));
   const high = Math.round(toFinite(range.high));
-  if (low <= 0 || high <= 0 || high < low) return null;
+  if (low <= 0 || high <= 0 || high < low) return DISCARDED;
 
   // Sanity band: compare midpoints, since a search that widens or tightens a
   // range is fine but one that RELOCATES it has almost certainly mismatched.
@@ -316,7 +324,7 @@ function interpret(
       console.log(
         `[verify] discarded: $${low}-${high} is ${ratio.toFixed(1)}x the estimate`,
       );
-      return null;
+      return DISCARDED;
     }
   }
 

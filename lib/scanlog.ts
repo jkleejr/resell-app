@@ -50,6 +50,10 @@ export type VerifyStatus =
   | "not_searched"
   /** Searched, and the findings were not good enough to replace the estimate. */
   | "no_listings"
+  /** Searched and found prices, but set them aside: an unusable range, or one
+   *  too far from the estimate to be the same item. Older records log this as
+   *  no_listings. */
+  | "discarded"
   /** Searched, and a few listings moved the price; shown without the tick. */
   | "few_listings"
   /** Searched, and the price shown is the verified one. */

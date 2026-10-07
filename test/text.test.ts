@@ -121,3 +121,20 @@ test("keeps text that already ends a sentence", () => {
   const text = "Apple iPhone 13 with a 6.1-inch display.";
   assert.equal(completeSentences(text), text);
 });
+
+test("completeSentences finishes a whole last sentence that only lacks its full stop", () => {
+  assert.equal(
+    completeSentences("Apple iPhone 13 in midnight blue with 128 GB storage"),
+    "Apple iPhone 13 in midnight blue with 128 GB storage.",
+  );
+  assert.equal(
+    completeSentences("Original acrylic painting, 16x20 inches. Blue shark over a teal sea"),
+    "Original acrylic painting, 16x20 inches. Blue shark over a teal sea.",
+  );
+});
+
+test("completeSentences still cuts a tail that stops mid-clause", () => {
+  assert.equal(completeSentences("Nike Air Max 90. Size 10, white and"), "Nike Air Max 90.");
+  assert.equal(completeSentences("Vintage lamp. Brass base with"), "Vintage lamp.");
+  assert.equal(completeSentences("Canon AE-1 camera body,"), "");
+});

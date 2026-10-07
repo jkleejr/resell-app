@@ -190,6 +190,10 @@ export interface VerifyOutcome {
   price: VerifiedPrice | null;
   /** True only when a search ran AND returned a verdict we could read. */
   searched: boolean;
+  /** True when that verdict had prices, but we set them aside: an unusable
+   *  range, or one too far from the estimate to be the same item. Listings
+   *  were found, so "Couldn't find listings" would be untrue. */
+  discarded?: boolean;
   /** What the call cost, tokens plus the search. Unset if it never returned. */
   costUSD?: number;
 }
