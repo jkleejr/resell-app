@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   Image,
   Linking,
   PanResponder,
@@ -108,6 +109,12 @@ const IPAD_SCALE = Platform.OS === "ios" && Platform.isPad ? 1.2 : 1;
 const ui = (n: number) => n * IPAD_SCALE;
 // Space between the photos on the compose screen.
 const THUMB_GAP = 14;
+// The home screen is one fixed screen with the photo buttons pinned to the
+// bottom, which needs about this much height. Every iPhone has it, and so does
+// a full-screen iPad either way up, but an iPad window can be resized shorter;
+// below this, home scrolls like the other pages instead of cutting off the
+// buttons.
+const HOME_MIN_HEIGHT = 600;
 // The widest the page gets, padding included. Phones are narrower, so this
 // only bites on iPad, where the page is a centred column at about the width
 // of a large phone in landscape rather than stretched edge to edge.
@@ -159,7 +166,7 @@ export default function App() {
   // exactly (the page has 24pt padding each side), whatever the device. The
   // window can report a width of 0 before its first layout, so neither size
   // is allowed below zero.
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const pageWidth = Math.min(screenWidth, ui(MAX_PAGE_WIDTH));
   const thumbSize = Math.max(
     0,
@@ -192,6 +199,15 @@ export default function App() {
   // rolled over or returns 429 and sets this straight back. That keeps the
   // reset honest without the app having to track a clock the server owns.
   const [limitReached, setLimitReached] = useState(false);
+  // An app left in the background is never relaunched, so "fresh launch" alone
+  // could leave the buttons locked long after the cap has reset. Coming back to
+  // the foreground counts too: the next scan asks the server again.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") setLimitReached(false);
+    });
+    return () => sub.remove();
+  }, []);
   // What the compose screen's Identify button counts as, for the anonymous
   // scan log: a fresh scan, or the "Add a photo & retry" path from a generic
   // result. ("Try again" after an error labels itself.)
@@ -633,7 +649,10 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
-      <Page home={home} scrollRef={scrollRef}>
+      <Page
+        home={home && screenHeight >= ui(HOME_MIN_HEIGHT)}
+        scrollRef={scrollRef}
+      >
         {/* The result page opens straight on the photo, with no name above. */}
         {status !== "done" && (
           <View style={styles.headerRow}>
@@ -1128,6 +1147,9 @@ function Page({
       // With the keyboard up after typing a detail, a tap on Identify should
       // identify — not just put the keyboard away and need a second tap.
       keyboardShouldPersistTaps="handled"
+      // Makes room for the keyboard and scrolls the detail field above it.
+      // On iPad in landscape the keyboard otherwise covers the field whole.
+      automaticallyAdjustKeyboardInsets
     >
       {children}
     </ScrollView>
