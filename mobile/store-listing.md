@@ -226,6 +226,11 @@ things a new version actually makes you handle:
       photo buttons, and the "Saved on this phone only…" hint is gone.
       Where to sell (`04-where.png`) still shows the removed BEST tag — minor,
       retake if convenient.
+- [ ] **iPad screenshots** — the app supports iPad now (`supportsTablet: true`),
+      so App Store Connect requires a 13-inch iPad set before it will submit.
+      Upload `docs/screenshots/ipad-13/01–05` (2064×2752) under iPad 13-inch;
+      smaller iPads reuse them. They're real iPad captures in the same frames
+      as the iPhone set, and already show the current home screen.
 - [ ] **Export compliance** — already declared in `app.json`
       (`ITSAppUsesNonExemptEncryption: false`), so App Store Connect won't re-ask.
 - [ ] **App Privacy** — unchanged. No new data is collected in this version (scan
